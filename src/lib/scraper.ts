@@ -1,6 +1,7 @@
 import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
 import * as cheerio from 'cheerio';
+import { renderPage, closeBrowser } from './browser';
 
 export interface ArticleData {
   title: string;
@@ -436,6 +437,35 @@ export async function scrapeArticle(url: string): Promise<ArticleData> {
     }
   } else {
     errors.push('Direct fetch succeeded but no article body found in HTML');
+  }
+
+  try {
+    errors.push('Attempting browser rendering (Puppeteer/Browserless)...');
+    const browserHtml = await renderPage(url);
+    if (browserHtml && browserHtml.length > 500) {
+      const article = parseWithReadability(browserHtml, url);
+      if (article) return article;
+
+      const jsonld = extractFromJsonLd(browserHtml);
+      if (jsonld && jsonld.content && jsonld.content.length > 200) {
+        return {
+          title: jsonld.title || 'Untitled',
+          content: jsonld.content,
+          textContent: jsonld.textContent || '',
+          excerpt: jsonld.textContent?.substring(0, 200) || '',
+          byline: jsonld.byline || extractAuthor(browserHtml) || null,
+          image: jsonld.image || extractFirstImage(browserHtml),
+          url,
+        };
+      }
+    }
+    errors.push('Browser rendering did not yield article content');
+  } catch (e) {
+    errors.push(
+      `Browser rendering failed: ${e instanceof Error ? e.message : 'unknown error'}`,
+    );
+  } finally {
+    closeBrowser().catch(() => {});
   }
 
   const googleHtml = await fetchFromGoogleCache(url);

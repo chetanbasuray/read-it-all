@@ -43,7 +43,7 @@ function isBotChallengePage(html: string): boolean {
   return BOT_CHALLENGE_PATTERNS.some((p) => lower.includes(p.toLowerCase()));
 }
 
-function extractFromJsonLd(
+export function extractFromJsonLd(
   html: string,
 ): Pick<ArticleData, 'title' | 'content' | 'textContent' | 'byline' | 'image'> | null {
   const $ = cheerio.load(html);
@@ -85,7 +85,7 @@ function extractFromJsonLd(
   return null;
 }
 
-function extractFirstImage(html: string): string | null {
+export function extractFirstImage(html: string): string | null {
   const $ = cheerio.load(html);
   const ogImage = $('meta[property="og:image"]').attr('content');
   if (ogImage) return ogImage;
@@ -100,7 +100,7 @@ function extractFirstImage(html: string): string | null {
   return null;
 }
 
-function extractTitle(html: string): string | null {
+export function extractTitle(html: string): string | null {
   const $ = cheerio.load(html);
   const ogTitle = $('meta[property="og:title"]').attr('content');
   if (ogTitle) return ogTitle;
@@ -115,7 +115,7 @@ function extractTitle(html: string): string | null {
   return null;
 }
 
-function extractAuthor(html: string): string | null {
+export function extractAuthor(html: string): string | null {
   const $ = cheerio.load(html);
   const author = $('meta[name="author"]').attr('content');
   if (author) return author;
@@ -260,7 +260,7 @@ async function fetchFromWayback(url: string): Promise<string | null> {
   return null;
 }
 
-function parseWithReadability(html: string, url: string): ArticleData | null {
+export function parseWithReadability(html: string, url: string): ArticleData | null {
   try {
     const dom = new JSDOM(html, { url });
     const reader = new Readability(dom.window.document);

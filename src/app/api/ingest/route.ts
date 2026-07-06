@@ -24,7 +24,15 @@ export async function OPTIONS() {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    let body: { url?: string; html?: string };
+
+    const contentType = request.headers.get('content-type') || '';
+    if (contentType.includes('text/plain')) {
+      const text = await request.text();
+      body = JSON.parse(text);
+    } else {
+      body = await request.json();
+    }
     const { url, html } = body as { url?: string; html?: string };
 
     if (!url || !html) {

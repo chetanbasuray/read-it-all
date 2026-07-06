@@ -21,9 +21,9 @@ export default function BookmarkletPage() {
 
   const bookmarkletCode = `javascript:(function(){
   var u='${appUrl}/api/ingest';
-  fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:location.href,html:document.documentElement.outerHTML})})
-  .then(function(r){return r.json()})
-  .then(function(d){if(d.id){window.open('${appUrl}/reader/'+d.id,'_blank')}else{alert('Could not extract: '+d.error)}})
+  var d=JSON.stringify({url:location.href,html:document.documentElement.outerHTML});
+  fetch(u,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:d})
+  .then(function(){window.location.href='${appUrl}/reader/bypass?url='+encodeURIComponent(location.href)})
   .catch(function(e){alert('Error: '+e.message)})
 })();`;
 

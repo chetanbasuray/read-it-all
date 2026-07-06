@@ -1,10 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { parseWithReadability, extractFromJsonLd, extractFirstImage, extractTitle, extractAuthor } from '@/lib/scraper';
+import {
+  parseWithReadability,
+  extractFromJsonLd,
+  extractFirstImage,
+  extractTitle,
+  extractAuthor,
+} from '@/lib/scraper';
 import { setCachedArticle } from '@/lib/redis';
 import { hashUrl } from '@/lib/utils';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,7 +30,7 @@ export async function POST(request: NextRequest) {
     if (!url || !html) {
       return NextResponse.json(
         { error: 'Both url and html are required' },
-        { status: 400 },
+        { status: 400, headers: corsHeaders },
       );
     }
 
@@ -22,13 +38,16 @@ export async function POST(request: NextRequest) {
     try {
       normalizedUrl = new URL(url).href;
     } catch {
-      return NextResponse.json({ error: 'Invalid URL' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Invalid URL' },
+        { status: 400, headers: corsHeaders },
+      );
     }
 
     if (html.length < 500) {
       return NextResponse.json(
         { error: 'HTML content is too short' },
-        { status: 400 },
+        { status: 400, headers: corsHeaders },
       );
     }
 
@@ -53,20 +72,26 @@ export async function POST(request: NextRequest) {
     if (!article) {
       return NextResponse.json(
         { error: 'Could not extract article from the provided HTML' },
-        { status: 422 },
+        { status: 422, headers: corsHeaders },
       );
     }
 
     await setCachedArticle(normalizedUrl, article);
 
-    return NextResponse.json({
-      id: hashUrl(normalizedUrl),
-      ...article,
-      cached: false,
-    });
+    return NextResponse.json(
+      {
+        id: hashUrl(normalizedUrl),
+        ...article,
+        cached: false,
+      },
+      { headers: corsHeaders },
+    );
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'An unexpected error occurred';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: message },
+      { status: 500, headers: corsHeaders },
+    );
   }
 }

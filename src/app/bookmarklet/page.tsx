@@ -1,16 +1,29 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+
 export default function BookmarkletPage() {
-  const ingestUrl =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    (typeof window !== 'undefined' ? window.location.origin : '');
+  const [appUrl, setAppUrl] = useState('');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setAppUrl(window.location.origin);
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full" />
+      </div>
+    );
+  }
 
   const bookmarkletCode = `javascript:(function(){
-  var url=encodeURIComponent(location.href);
-  var u='${ingestUrl}/api/ingest';
+  var u='${appUrl}/api/ingest';
   fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:location.href,html:document.documentElement.outerHTML})})
   .then(function(r){return r.json()})
-  .then(function(d){if(d.id){window.open('${ingestUrl}/reader/'+d.id,'_blank')}else{alert('Could not extract article: '+d.error)}})
+  .then(function(d){if(d.id){window.open('${appUrl}/reader/'+d.id,'_blank')}else{alert('Could not extract: '+d.error)}})
   .catch(function(e){alert('Error: '+e.message)})
 })();`;
 
@@ -40,16 +53,16 @@ export default function BookmarkletPage() {
           <ol className="text-sm text-gray-500 dark:text-gray-400 space-y-2 list-decimal pl-4">
             <li>Make sure your bookmarks bar is visible (Cmd+Shift+B)</li>
             <li>
-              Drag the <strong>&quot;Read in Reader&quot;</strong> button above
-              to your bookmarks bar
+              Drag the &quot;Read in Reader&quot; button above to your bookmarks
+              bar
             </li>
             <li>
               Navigate to any paywalled article (e.g. WSJ, NYT) and click the
               bookmarklet
             </li>
             <li>
-              The article will open in the reader view — no scraping needed,
-              it uses your browser&apos;s authenticated session
+              The article will open in the reader view &mdash; no scraping
+              needed, it uses your browser&apos;s authenticated session
             </li>
           </ol>
         </div>
@@ -57,9 +70,10 @@ export default function BookmarkletPage() {
         <div className="mt-6 text-left bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-5 border border-yellow-200 dark:border-yellow-800">
           <p className="text-sm text-yellow-700 dark:text-yellow-300">
             <strong>How it works:</strong> The bookmarklet sends the current
-            page&apos;s HTML to the ingest API, which extracts the article
-            using Readability. Since it runs in your browser, all your cookies
-            and session data are included — no DataDome blocking.
+            page&apos;s HTML to <code className="text-xs font-mono">{appUrl}/api/ingest</code>,
+            which extracts the article using Readability. Since it runs in your
+            browser, all your cookies and session data are included &mdash; no
+            DataDome blocking.
           </p>
         </div>
       </div>

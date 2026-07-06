@@ -11,6 +11,7 @@ interface ReaderProps {
     image: string | null;
     excerpt: string;
     url: string;
+    cached?: boolean;
   };
   onBack: () => void;
 }
@@ -109,14 +110,32 @@ export function Reader({ article, onBack }: ReaderProps) {
               </p>
             )}
 
-            <a
-              href={article.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-block mt-3 text-sm text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              View Original &rarr;
-            </a>
+            <div className="flex items-center gap-3 mt-3">
+              <a
+                href={article.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                View Original &rarr;
+              </a>
+              {article.cached !== undefined && (
+                <span
+                  className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
+                    article.cached
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                      : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                  }`}
+                >
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full ${
+                      article.cached ? 'bg-green-500' : 'bg-yellow-500'
+                    }`}
+                  />
+                  {article.cached ? 'Cached' : 'Fresh scrape'}
+                </span>
+              )}
+            </div>
           </header>
 
           <div

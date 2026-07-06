@@ -3,12 +3,14 @@
 import { useState, type FormEvent } from 'react';
 
 interface UrlInputProps {
-  onSubmit: (url: string) => Promise<void>;
+  onSubmit: (url: string, cookies?: string) => Promise<void>;
   isLoading: boolean;
 }
 
 export function UrlInput({ onSubmit, isLoading }: UrlInputProps) {
   const [url, setUrl] = useState('');
+  const [cookies, setCookies] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async (e: FormEvent) => {
@@ -28,7 +30,7 @@ export function UrlInput({ onSubmit, isLoading }: UrlInputProps) {
       return;
     }
 
-    await onSubmit(trimmed);
+    await onSubmit(trimmed, cookies.trim() || undefined);
   };
 
   return (
@@ -65,6 +67,36 @@ export function UrlInput({ onSubmit, isLoading }: UrlInputProps) {
           )}
         </button>
       </div>
+
+      <div className="mt-2">
+        <button
+          type="button"
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+        >
+          {showAdvanced ? 'Hide' : 'Show'} advanced options
+        </button>
+      </div>
+
+      {showAdvanced && (
+        <div className="mt-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
+          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+            Session Cookies (for authenticated sites like WSJ)
+          </label>
+          <textarea
+            value={cookies}
+            onChange={(e) => setCookies(e.target.value)}
+            placeholder="Paste cookies here (e.g. wsj=abc123; sid=xyz789)..."
+            rows={3}
+            className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+          />
+          <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
+            Open DevTools &rarr; Application &rarr; Cookies, copy all, paste here.
+            The server will use these to authenticate as you.
+          </p>
+        </div>
+      )}
+
       {error && (
         <p className="mt-2 text-sm text-red-500 dark:text-red-400">{error}</p>
       )}

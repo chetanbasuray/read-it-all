@@ -128,19 +128,24 @@ async function fetchWithUA(
   url: string,
   ua: string,
   extraHeaders?: Record<string, string>,
+  cookies?: string,
 ): Promise<{ html: string | null; status: number | null; blocked: boolean }> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
+    const headers: Record<string, string> = {
+      'User-Agent': ua,
+      Accept:
+        'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.5',
+      ...extraHeaders,
+    };
+    if (cookies) {
+      headers.Cookie = cookies;
+    }
     const response = await fetch(url, {
       signal: controller.signal,
-      headers: {
-        'User-Agent': ua,
-        Accept:
-          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        ...extraHeaders,
-      },
+      headers,
       redirect: 'follow',
     });
     clearTimeout(timeout);
@@ -358,13 +363,16 @@ const ACCEPT_VARIANTS = [
   { Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8' },
 ];
 
-export async function scrapeArticle(url: string): Promise<ArticleData> {
+export async function scrapeArticle(
+  url: string,
+  cookies?: string,
+): Promise<ArticleData> {
   const errors: string[] = [];
   let allBlocked = true;
 
   for (const { ua, name } of USER_AGENTS) {
     for (const headers of ACCEPT_VARIANTS) {
-      const { html, status, blocked } = await fetchWithUA(url, ua, headers);
+      const { html, status, blocked } = await fetchWithUA(url, ua, headers, cookies);
       if (!html) {
         if (status !== null) {
           errors.push(`HTTP ${status} (${name})`);
@@ -415,7 +423,7 @@ export async function scrapeArticle(url: string): Promise<ArticleData> {
       for (const { ua, name } of USER_AGENTS.slice(0, 2)) {
         const { html, blocked } = await fetchWithUA(ampUrl, ua, {
           Referer: 'https://www.google.com/',
-        });
+        }, cookies);
         if (html && !blocked && html.length > 500) {
           const article = parseWithReadability(html, ampUrl);
           if (article) return article;
@@ -441,7 +449,7 @@ export async function scrapeArticle(url: string): Promise<ArticleData> {
 
   try {
     errors.push('Attempting browser rendering (Puppeteer/Browserless)...');
-    const browserHtml = await renderPage(url);
+    const browserHtml = await renderPage(url, cookies);
     if (browserHtml && browserHtml.length > 500) {
       const article = parseWithReadability(browserHtml, url);
       if (article) return article;

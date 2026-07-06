@@ -26,7 +26,7 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
 
-  const handleSubmit = async (url: string) => {
+  const handleSubmit = async (url: string, cookies?: string) => {
     setIsLoading(true);
     setError(null);
     setArticle(null);
@@ -35,7 +35,7 @@ export default function HomePage() {
       const response = await fetch('/api/bypass', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, cookies }),
       });
 
       const data = await response.json();

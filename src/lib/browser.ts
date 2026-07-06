@@ -2,7 +2,14 @@ import type { Browser } from 'puppeteer';
 
 let browserInstance: Browser | null = null;
 
-async function getLocalHtml(url: string): Promise<string> {
+function parseCookies(cookieString: string): Array<{ name: string; value: string; domain?: string }> {
+  return cookieString.split(';').filter(Boolean).map((pair) => {
+    const [name, ...rest] = pair.trim().split('=');
+    return { name: name.trim(), value: rest.join('=').trim() };
+  });
+}
+
+async function getLocalHtml(url: string, cookies?: string): Promise<string> {
   const puppeteer = await import('puppeteer');
 
   if (!browserInstance || !browserInstance.connected) {
@@ -29,6 +36,18 @@ async function getLocalHtml(url: string): Promise<string> {
     Object.defineProperty(navigator, 'webdriver', { get: () => false });
   });
 
+  if (cookies) {
+    try {
+      const parsed = parseCookies(cookies);
+      const domain = new URL(url).hostname;
+      await page.setCookie(
+        ...parsed.map((c) => ({ name: c.name, value: c.value, domain })),
+      );
+    } catch {
+      // cookie setting failed silently
+    }
+  }
+
   await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
   await page.evaluate(() => document.dispatchEvent(new Event('readystatechange')));
   await new Promise((r) => setTimeout(r, 2000));
@@ -38,7 +57,7 @@ async function getLocalHtml(url: string): Promise<string> {
   return html;
 }
 
-async function getCloudHtml(url: string): Promise<string> {
+async function getCloudHtml(url: string, cookies?: string): Promise<string> {
   const baseUrl =
     process.env.BROWSERLESS_URL || 'https://chrome.browserless.io';
   const token = process.env.BROWSERLESS_API_KEY;
@@ -53,6 +72,7 @@ async function getCloudHtml(url: string): Promise<string> {
         options: {
           waitFor: 3000,
           waitUntil: 'networkidle2',
+          ...(cookies ? { cookies: [{ name: 'Cookie', value: cookies }] } : {}),
         },
       }),
     },
@@ -66,11 +86,11 @@ async function getCloudHtml(url: string): Promise<string> {
   return await response.text();
 }
 
-export async function renderPage(url: string): Promise<string> {
+export async function renderPage(url: string, cookies?: string): Promise<string> {
   if (process.env.BROWSERLESS_API_KEY) {
-    return getCloudHtml(url);
+    return getCloudHtml(url, cookies);
   }
-  return getLocalHtml(url);
+  return getLocalHtml(url, cookies);
 }
 
 export async function closeBrowser(): Promise<void> {

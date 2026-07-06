@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { url } = body as { url?: string };
+    const { url, cookies } = body as { url?: string; cookies?: string };
 
     if (!url || typeof url !== 'string') {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
@@ -26,17 +26,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Only http and https URLs are supported' }, { status: 400 });
     }
 
-    const cached = await getCachedArticle(normalizedUrl);
-    if (cached) {
-      return NextResponse.json({
-        id: hashUrl(normalizedUrl),
-        ...cached,
-        cached: true,
-      });
+    if (!cookies) {
+      const cached = await getCachedArticle(normalizedUrl);
+      if (cached) {
+        return NextResponse.json({
+          id: hashUrl(normalizedUrl),
+          ...cached,
+          cached: true,
+        });
+      }
     }
 
-    const article = await scrapeArticle(normalizedUrl);
-    await setCachedArticle(normalizedUrl, article);
+    const article = await scrapeArticle(normalizedUrl, cookies);
+    if (!cookies) {
+      await setCachedArticle(normalizedUrl, article);
+    }
 
     return NextResponse.json({
       id: hashUrl(normalizedUrl),

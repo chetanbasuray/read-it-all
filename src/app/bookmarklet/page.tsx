@@ -20,41 +20,27 @@ export default function BookmarkletPage() {
   }
 
   const bookmarkletCode = `javascript:(function(){
-  var u='${appUrl}/api/ingest';
-  function go(d){fetch(u,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:d}).then(function(){window.location.href='${appUrl}/reader/bypass?url='+encodeURIComponent(location.href)}).catch(function(e){alert('Error: '+e.message)})}
-  function extract(){
+  var A='${appUrl}';
+  function ex(){
     var e=document.querySelector('article');
     if(e&&e.textContent.length>200)return e.innerHTML;
-    var sel=['[role="main"]','.article-content','.story-body','#article-body','.entry-content','.post-content','main'];
-    for(var i=0;i<sel.length;i++){e=document.querySelector(sel[i]);if(e&&e.textContent.length>200)return e.innerHTML}
-    var ps='';e=document.querySelectorAll('p');
-    for(i=0;i<e.length;i++)ps+=e[i].outerHTML;
-    return ps.length>200?'<div>'+ps+'</div>':document.body.innerHTML;
-  }
-  function sendPreParsed(title,content){
-    var t=content.replace(/<[^>]*>/g,'');
-    go(JSON.stringify({url:location.href,title:title||document.title,content:content,textContent:t,byline:'',excerpt:t.substring(0,200),image:''}));
-  }
-  function sendRaw(){go(JSON.stringify({url:location.href,html:document.documentElement.outerHTML}))}
-  function withReadability(){
-    var s=document.createElement('script');
-    s.src='https://cdn.jsdelivr.net/npm/@mozilla/readability@0.5.0/Readability.js';
-    s.onload=function(){
-      var doc=document.cloneNode(true);
-      var article=new Readability(doc).parse();
-      if(article&&article.content&&article.content.length>200){
-        sendPreParsed(article.title,article.content);
-      }else sendRaw();
-    };
-    s.onerror=sendRaw;
-    document.head.appendChild(s);
-    setTimeout(function(){if(!window.Readability)sendRaw()},3000);
+    var s=['[role="main"]','.article-content','.story-body','#article-body','.entry-content','.post-content','main'];
+    for(var i=0;i<s.length;i++){e=document.querySelector(s[i]);if(e&&e.textContent.length>200)return e.innerHTML}
+    var p='';e=document.querySelectorAll('p');
+    for(i=0;i<e.length;i++)p+=e[i].outerHTML;
+    return p.length>200?'<div>'+p+'</div>':null;
   }
   try{
-    var inline=extract();
-    if(inline.length>500){sendPreParsed(document.title,inline)}
-    else withReadability();
-  }catch(e){sendRaw()}
+    var c=ex();
+    if(c){
+      var t=c.replace(/<[^>]*>/g,'');
+      var d=JSON.stringify({url:location.href,title:document.title,content:c,textContent:t,byline:'',excerpt:t.substring(0,200),image:''});
+      if(d.length<90000){window.location.href=A+'/reader/accept#'+encodeURIComponent(d);return}
+    }
+  }catch(e){}
+  fetch(A+'/api/ingest',{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({url:location.href,html:document.documentElement.outerHTML})})
+  .then(function(){window.location.href=A+'/reader/bypass?url='+encodeURIComponent(location.href)})
+  .catch(function(e){alert('Error: '+e.message)})
 })();`;
 
   return (
@@ -99,11 +85,11 @@ export default function BookmarkletPage() {
 
         <div className="mt-6 text-left bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-5 border border-yellow-200 dark:border-yellow-800">
           <p className="text-sm text-yellow-700 dark:text-yellow-300">
-            <strong>How it works:</strong> The bookmarklet sends the current
-            page&apos;s HTML to <code className="text-xs font-mono">{appUrl}/api/ingest</code>,
-            which extracts the article using Readability. Since it runs in your
-            browser, all your cookies and session data are included &mdash; no
-            DataDome blocking.
+            <strong>How it works:</strong> The bookmarklet extracts article
+            content from the live page DOM and passes it to the reader via URL
+            hash &mdash; no CORS issues, no DataDome blocking. For large
+            articles it falls back to a background fetch. Since everything runs
+            in your browser, your authenticated session is used.
           </p>
         </div>
       </div>

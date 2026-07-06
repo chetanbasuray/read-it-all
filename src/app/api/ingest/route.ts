@@ -18,13 +18,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
+interface ArticleInput {
+  url?: string;
+  html?: string;
+  title?: string;
+  content?: string;
+  textContent?: string;
+  byline?: string;
+  excerpt?: string;
+  image?: string;
+}
+
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders });
 }
 
 export async function POST(request: NextRequest) {
   try {
-    let body: { url?: string; html?: string };
+    let body: ArticleInput;
 
     const contentType = request.headers.get('content-type') || '';
     if (contentType.includes('text/plain')) {
@@ -33,11 +44,12 @@ export async function POST(request: NextRequest) {
     } else {
       body = await request.json();
     }
-    const { url, html } = body as { url?: string; html?: string };
 
-    if (!url || !html) {
+    const { url, html, title, content, textContent, byline, excerpt, image } = body;
+
+    if (!url) {
       return NextResponse.json(
-        { error: 'Both url and html are required' },
+        { error: 'url is required' },
         { status: 400, headers: corsHeaders },
       );
     }
@@ -52,34 +64,49 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (html.length < 500) {
-      return NextResponse.json(
-        { error: 'HTML content is too short' },
-        { status: 400, headers: corsHeaders },
-      );
-    }
+    let article: {
+      title: string;
+      content: string;
+      textContent: string;
+      excerpt: string;
+      byline: string | null;
+      image: string | null;
+      url: string;
+    } | null = null;
 
-    const article =
-      parseWithReadability(html, normalizedUrl) ||
-      (() => {
-        const jsonld = extractFromJsonLd(html);
-        if (jsonld && jsonld.content && jsonld.content.length > 200) {
-          return {
-            title: jsonld.title || 'Untitled',
-            content: jsonld.content,
-            textContent: jsonld.textContent || '',
-            excerpt: jsonld.textContent?.substring(0, 200) || '',
-            byline: jsonld.byline || extractAuthor(html) || null,
-            image: jsonld.image || extractFirstImage(html),
-            url: normalizedUrl,
-          };
-        }
-        return null;
-      })();
+    if (content && content.length > 200) {
+      article = {
+        title: title || 'Untitled',
+        content,
+        textContent: textContent || '',
+        excerpt: excerpt || (textContent || content.replace(/<[^>]*>/g, '')).substring(0, 200),
+        byline: byline || null,
+        image: image || null,
+        url: normalizedUrl,
+      };
+    } else if (html && html.length >= 500) {
+      article =
+        parseWithReadability(html, normalizedUrl) ||
+        (() => {
+          const jsonld = extractFromJsonLd(html);
+          if (jsonld && jsonld.content && jsonld.content.length > 200) {
+            return {
+              title: jsonld.title || 'Untitled',
+              content: jsonld.content,
+              textContent: jsonld.textContent || '',
+              excerpt: jsonld.textContent?.substring(0, 200) || '',
+              byline: jsonld.byline || extractAuthor(html) || null,
+              image: jsonld.image || extractFirstImage(html),
+              url: normalizedUrl,
+            };
+          }
+          return null;
+        })();
+    }
 
     if (!article) {
       return NextResponse.json(
-        { error: 'Could not extract article from the provided HTML' },
+        { error: 'Could not extract article from the provided data' },
         { status: 422, headers: corsHeaders },
       );
     }

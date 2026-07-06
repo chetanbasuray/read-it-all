@@ -21,10 +21,23 @@ export default function BookmarkletPage() {
 
   const bookmarkletCode = `javascript:(function(){
   var u='${appUrl}/api/ingest';
-  var d=JSON.stringify({url:location.href,html:document.documentElement.outerHTML});
-  fetch(u,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:d})
-  .then(function(){window.location.href='${appUrl}/reader/bypass?url='+encodeURIComponent(location.href)})
-  .catch(function(e){alert('Error: '+e.message)})
+  function go(d){fetch(u,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:d}).then(function(){window.location.href='${appUrl}/reader/bypass?url='+encodeURIComponent(location.href)}).catch(function(e){alert('Error: '+e.message)})}
+  try{
+    var s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/@mozilla/readability@0.5.0/Readability.js';
+    s.onload=function(){
+      var doc=document.cloneNode(true);
+      var article=new Readability(doc).parse();
+      if(article&&article.content&&article.content.length>200){
+        go(JSON.stringify({url:location.href,title:article.title,content:article.content,textContent:article.textContent||'',byline:article.byline||'',excerpt:article.excerpt||'',image:''}));
+      }else{
+        go(JSON.stringify({url:location.href,html:document.documentElement.outerHTML}));
+      }
+    };
+    s.onerror=function(){go(JSON.stringify({url:location.href,html:document.documentElement.outerHTML}))};
+    document.head.appendChild(s);
+    setTimeout(function(){if(!window.Readability){go(JSON.stringify({url:location.href,html:document.documentElement.outerHTML}))}},3000);
+  }catch(e){go(JSON.stringify({url:location.href,html:document.documentElement.outerHTML}))}
 })();`;
 
   return (

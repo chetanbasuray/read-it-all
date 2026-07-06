@@ -22,22 +22,39 @@ export default function BookmarkletPage() {
   const bookmarkletCode = `javascript:(function(){
   var u='${appUrl}/api/ingest';
   function go(d){fetch(u,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:d}).then(function(){window.location.href='${appUrl}/reader/bypass?url='+encodeURIComponent(location.href)}).catch(function(e){alert('Error: '+e.message)})}
-  try{
+  function extract(){
+    var e=document.querySelector('article');
+    if(e&&e.textContent.length>200)return e.innerHTML;
+    var sel=['[role="main"]','.article-content','.story-body','#article-body','.entry-content','.post-content','main'];
+    for(var i=0;i<sel.length;i++){e=document.querySelector(sel[i]);if(e&&e.textContent.length>200)return e.innerHTML}
+    var ps='';e=document.querySelectorAll('p');
+    for(i=0;i<e.length;i++)ps+=e[i].outerHTML;
+    return ps.length>200?'<div>'+ps+'</div>':document.body.innerHTML;
+  }
+  function sendPreParsed(title,content){
+    var t=content.replace(/<[^>]*>/g,'');
+    go(JSON.stringify({url:location.href,title:title||document.title,content:content,textContent:t,byline:'',excerpt:t.substring(0,200),image:''}));
+  }
+  function sendRaw(){go(JSON.stringify({url:location.href,html:document.documentElement.outerHTML}))}
+  function withReadability(){
     var s=document.createElement('script');
     s.src='https://cdn.jsdelivr.net/npm/@mozilla/readability@0.5.0/Readability.js';
     s.onload=function(){
       var doc=document.cloneNode(true);
       var article=new Readability(doc).parse();
       if(article&&article.content&&article.content.length>200){
-        go(JSON.stringify({url:location.href,title:article.title,content:article.content,textContent:article.textContent||'',byline:article.byline||'',excerpt:article.excerpt||'',image:''}));
-      }else{
-        go(JSON.stringify({url:location.href,html:document.documentElement.outerHTML}));
-      }
+        sendPreParsed(article.title,article.content);
+      }else sendRaw();
     };
-    s.onerror=function(){go(JSON.stringify({url:location.href,html:document.documentElement.outerHTML}))};
+    s.onerror=sendRaw;
     document.head.appendChild(s);
-    setTimeout(function(){if(!window.Readability){go(JSON.stringify({url:location.href,html:document.documentElement.outerHTML}))}},3000);
-  }catch(e){go(JSON.stringify({url:location.href,html:document.documentElement.outerHTML}))}
+    setTimeout(function(){if(!window.Readability)sendRaw()},3000);
+  }
+  try{
+    var inline=extract();
+    if(inline.length>500){sendPreParsed(document.title,inline)}
+    else withReadability();
+  }catch(e){sendRaw()}
 })();`;
 
   return (

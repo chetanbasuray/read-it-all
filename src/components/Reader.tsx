@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useTheme } from './ThemeProvider';
 
 interface ReaderProps {
   article: {
+    id?: string;
     title: string;
     content: string;
     byline: string | null;
@@ -35,6 +36,12 @@ export function Reader({ article, onBack }: ReaderProps) {
       }).catch(() => {});
     }
   }, [article.title]);
+
+  useEffect(() => {
+    if (article.id) {
+      fetch(`/api/article/${article.id}`, { method: 'POST' }).catch(() => {});
+    }
+  }, [article.id]);
 
   const decreaseFont = () => setFontSizeIndex((i) => Math.max(0, i - 1));
   const increaseFont = () => setFontSizeIndex((i) => Math.min(FONT_SIZES.length - 1, i + 1));

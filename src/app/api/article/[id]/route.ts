@@ -17,7 +17,7 @@ export async function GET(
       );
     }
 
-    const views = await incrementArticleViews(params.id);
+    const views = await getArticleViews(params.id);
 
     return NextResponse.json({
       id: params.id,
@@ -25,6 +25,20 @@ export async function GET(
       cached: true,
       views,
     });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'An unexpected error occurred';
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+export async function POST(
+  _request: NextRequest,
+  { params }: { params: { id: string } },
+) {
+  try {
+    const views = await incrementArticleViews(params.id);
+    return NextResponse.json({ views });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : 'An unexpected error occurred';

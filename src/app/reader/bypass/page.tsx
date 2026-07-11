@@ -6,6 +6,7 @@ import { Reader } from '@/components/Reader';
 import Link from 'next/link';
 
 interface ArticleData {
+  id?: string;
   title: string;
   content: string;
   textContent: string;

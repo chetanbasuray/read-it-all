@@ -1,8 +1,21 @@
 'use client';
 
 import { useEffect, useState, Suspense } from 'react';
+import { Reader } from '@/components/Reader';
 
 function AcceptInner() {
+  const [article, setArticle] = useState<{
+    id: string;
+    title: string;
+    content: string;
+    textContent: string;
+    excerpt: string;
+    byline: string | null;
+    image: string | null;
+    url: string;
+    cached: boolean;
+    views?: number;
+  } | null>(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -25,8 +38,9 @@ function AcceptInner() {
           if (!r.ok) throw new Error('Ingest failed');
           return r.json();
         })
-        .then((d: { id: string }) => {
-          window.location.href = `/reader/${d.id}`;
+        .then((d) => {
+          window.history.replaceState(null, '', `/reader/${d.id}`);
+          setArticle(d);
         })
         .catch((e) => {
           setError('Failed to cache article: ' + e.message);
@@ -50,16 +64,20 @@ function AcceptInner() {
     );
   }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4" />
-        <p className="text-gray-500 dark:text-gray-400 text-sm">
-          Processing article...
-        </p>
+  if (!article) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4" />
+          <p className="text-gray-500 dark:text-gray-400 text-sm">
+            Processing article...
+          </p>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  return <Reader article={article} onBack={() => (window.location.href = '/')} />;
 }
 
 export default function AcceptPage() {

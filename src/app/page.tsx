@@ -1,35 +1,22 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { UrlInput } from '@/components/UrlInput';
-import { Reader } from '@/components/Reader';
 
 interface ApiError {
   error: string;
   details?: string[];
 }
 
-interface ArticleResult {
-  id: string;
-  title: string;
-  content: string;
-  textContent: string;
-  excerpt: string;
-  byline: string | null;
-  image: string | null;
-  url: string;
-  cached: boolean;
-}
-
 export default function HomePage() {
-  const [article, setArticle] = useState<ArticleResult | null>(null);
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
 
   const handleSubmit = async (url: string, cookies?: string) => {
     setIsLoading(true);
     setError(null);
-    setArticle(null);
 
     try {
       const response = await fetch('/api/bypass', {
@@ -45,22 +32,15 @@ export default function HomePage() {
         return;
       }
 
-      setArticle(data);
+      if (data.id) {
+        router.push(`/reader/${data.id}`);
+      }
     } catch {
       setError({ error: 'Network error. Please check your connection and try again.' });
     } finally {
       setIsLoading(false);
     }
   };
-
-  const handleBack = () => {
-    setArticle(null);
-    setError(null);
-  };
-
-  if (article) {
-    return <Reader article={article} onBack={handleBack} />;
-  }
 
   return (
     <div className="min-h-screen flex flex-col">

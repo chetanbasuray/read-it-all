@@ -6,7 +6,7 @@ import {
   extractTitle,
   extractAuthor,
 } from '@/lib/scraper';
-import { setCachedArticle } from '@/lib/redis';
+import { setCachedArticle, getCachedArticle, getArticleViews } from '@/lib/redis';
 import { hashUrl } from '@/lib/utils';
 
 export const runtime = 'nodejs';
@@ -111,11 +111,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const existing = await getCachedArticle(normalizedUrl);
+    const id = hashUrl(normalizedUrl);
+
+    if (existing) {
+      const views = await getArticleViews(id);
+      return NextResponse.json(
+        {
+          id,
+          ...existing,
+          cached: true,
+          views,
+        },
+        { headers: corsHeaders },
+      );
+    }
+
     await setCachedArticle(normalizedUrl, article);
 
     return NextResponse.json(
       {
-        id: hashUrl(normalizedUrl),
+        id,
         ...article,
         cached: false,
         views: 0,

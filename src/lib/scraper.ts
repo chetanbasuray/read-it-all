@@ -1,8 +1,12 @@
 import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
 import * as cheerio from 'cheerio';
-import { renderPage, closeBrowser } from './browser';
 import { sanitizeHtml } from './sanitize';
+
+async function dynamicRenderPage(url: string, cookies?: string): Promise<string> {
+  const { renderPage } = await import('./browser');
+  return renderPage(url, cookies);
+}
 
 export interface ArticleData {
   title: string;
@@ -453,7 +457,7 @@ export async function scrapeArticle(
 
   try {
     errors.push('Attempting browser rendering (Puppeteer/Browserless)...');
-    const browserHtml = await renderPage(url, cookies);
+    const browserHtml = await dynamicRenderPage(url, cookies);
     if (browserHtml && browserHtml.length > 500) {
       const article = parseWithReadability(browserHtml, url);
       if (article) return article;

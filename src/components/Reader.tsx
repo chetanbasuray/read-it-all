@@ -38,9 +38,15 @@ export function Reader({ article, onBack }: ReaderProps) {
   }, [article.title]);
 
   useEffect(() => {
-    if (article.id) {
-      fetch(`/api/article/${article.id}`, { method: 'POST' }).catch(() => {});
+    if (!article.id) return;
+    try {
+      const key = `ria_viewed_${article.id}`;
+      if (localStorage.getItem(key)) return;
+      localStorage.setItem(key, '1');
+    } catch {
+      // localStorage unavailable, count the view anyway
     }
+    fetch(`/api/article/${article.id}`, { method: 'POST' }).catch(() => {});
   }, [article.id]);
 
   const decreaseFont = () => setFontSizeIndex((i) => Math.max(0, i - 1));

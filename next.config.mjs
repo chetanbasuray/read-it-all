@@ -2,7 +2,7 @@
 const nextConfig = {
   webpack: (config, { isServer }) => {
     if (isServer) {
-      config.externals = [...(config.externals || []), 'puppeteer', 'playwright'];
+      config.externals = [...(config.externals || []), 'puppeteer', 'playwright', 'jsdom'];
     }
     return config;
   },

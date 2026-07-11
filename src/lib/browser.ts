@@ -1,4 +1,5 @@
-import type { Browser, BrowserContext } from 'playwright';
+type Browser = any;
+type BrowserContext = any;
 
 let browserInstance: Browser | null = null;
 let idleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -28,8 +29,18 @@ function parseCookies(cookieString: string, domain: string): { name: string; val
   });
 }
 
+let _chromium: any = null;
+async function getChromium() {
+  if (!_chromium) {
+    const { createRequire } = await import('node:module');
+    const myRequire = createRequire(import.meta.url);
+    _chromium = myRequire('playwright').chromium;
+  }
+  return _chromium;
+}
+
 async function getLocalHtml(url: string, cookies?: string): Promise<string> {
-  const { chromium } = await import('playwright');
+  const chromium = await getChromium();
 
   if (!browserInstance || !browserInstance.isConnected()) {
     browserInstance = await chromium.launch({

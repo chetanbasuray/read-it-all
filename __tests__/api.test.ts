@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ScrapeError } from '@/lib/scraper';
+import { ScrapeError, extractFirstImage } from '@/lib/scraper';
+import { sanitizeHtml } from '@/lib/sanitize';
+import { validateUrl } from '@/lib/urlSafety';
 
 vi.hoisted(() => {
   process.env.KV_URL = 'https://dummy-redis.example.com';
@@ -166,5 +168,105 @@ describe('POST /api/bypass', () => {
     expect(data.title).toBe('Cached Article');
     expect(data.cached).toBe(true);
     expect(scrapeArticle).not.toHaveBeenCalled();
+  });
+});
+
+describe('sanitizeHtml', () => {
+  it('strips script tags', () => {
+    expect(sanitizeHtml('<p>safe</p><script>alert(1)</script>')).toBe(
+      '<p>safe</p>',
+    );
+  });
+
+  it('strips event handlers', () => {
+    expect(sanitizeHtml('<p onclick="alert(1)">text</p>')).toBe('<p>text</p>');
+  });
+
+  it('strips javascript: href', () => {
+    expect(
+      sanitizeHtml('<a href="javascript:alert(1)">click</a>'),
+    ).toBe('<a>click</a>');
+  });
+
+  it('strips iframe and object tags', () => {
+    expect(
+      sanitizeHtml('<iframe src="https://evil.com"></iframe><p>ok</p>'),
+    ).toBe('<p>ok</p>');
+  });
+
+  it('allows safe inline elements', () => {
+    expect(
+      sanitizeHtml('<strong>bold</strong> <em>italic</em> <a href="https://x.com">link</a>'),
+    ).toBe('<strong>bold</strong> <em>italic</em> <a href="https://x.com">link</a>');
+  });
+});
+
+describe('validateUrl', () => {
+  it('rejects loopback 127.0.0.1', async () => {
+    await expect(validateUrl('http://127.0.0.1:3000/api')).rejects.toThrow(
+      'loopback address',
+    );
+  });
+
+  it('rejects metadata IP 169.254.169.254', async () => {
+    await expect(validateUrl('http://169.254.169.254/latest/meta-data/')).rejects.toThrow(
+      'private IP',
+    );
+  });
+
+  it('rejects private 10.x.x.x', async () => {
+    await expect(validateUrl('http://10.0.0.1/admin')).rejects.toThrow(
+      'private IP',
+    );
+  });
+
+  it('lets public URLs pass', async () => {
+    await expect(validateUrl('https://www.example.com/article')).resolves.toBeUndefined();
+  });
+
+  it('rejects invalid URLs', async () => {
+    await expect(validateUrl('')).rejects.toThrow('Invalid URL');
+  });
+});
+
+describe('extractFirstImage', () => {
+  it('picks og:image', () => {
+    const result = extractFirstImage(
+      '<meta property="og:image" content="https://example.com/og.jpg" /><img src="first.jpg" />',
+      'https://example.com/article',
+    );
+    expect(result).toBe('https://example.com/og.jpg');
+  });
+
+  it('picks twitter:image over img src', () => {
+    const result = extractFirstImage(
+      '<meta name="twitter:image" content="https://example.com/tw.jpg" /><img src="first.jpg" />',
+      'https://example.com/article',
+    );
+    expect(result).toBe('https://example.com/tw.jpg');
+  });
+
+  it('resolves relative img src against baseUrl', () => {
+    const result = extractFirstImage(
+      '<article><img src="/images/hero.jpg" /></article>',
+      'https://example.com/article',
+    );
+    expect(result).toBe('https://example.com/images/hero.jpg');
+  });
+
+  it('resolves protocol-relative img src against baseUrl', () => {
+    const result = extractFirstImage(
+      '<article><img src="//cdn.example.com/hero.jpg" /></article>',
+      'https://example.com/article',
+    );
+    expect(result).toBe('https://cdn.example.com/hero.jpg');
+  });
+
+  it('returns null when no image found', () => {
+    const result = extractFirstImage(
+      '<p>no images here</p>',
+      'https://example.com/article',
+    );
+    expect(result).toBeNull();
   });
 });

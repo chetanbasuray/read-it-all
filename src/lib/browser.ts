@@ -1,6 +1,32 @@
 import type { Browser, BrowserContext } from 'playwright';
 
 let browserInstance: Browser | null = null;
+let idleTimer: ReturnType<typeof setTimeout> | null = null;
+const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+
+function resetIdleTimer() {
+  if (idleTimer) clearTimeout(idleTimer);
+  idleTimer = setTimeout(async () => {
+    if (browserInstance) {
+      await browserInstance.close();
+      browserInstance = null;
+    }
+  }, IDLE_TIMEOUT_MS);
+}
+
+process.on('SIGTERM', async () => {
+  if (browserInstance) {
+    await browserInstance.close();
+    browserInstance = null;
+  }
+});
+
+function parseCookies(cookieString: string, domain: string): { name: string; value: string; domain: string; path?: string }[] {
+  return cookieString.split(';').filter(Boolean).map((pair) => {
+    const [name, ...rest] = pair.trim().split('=');
+    return { name: name.trim(), value: rest.join('=').trim(), domain, path: '/' };
+  });
+}
 
 async function getLocalHtml(url: string, cookies?: string): Promise<string> {
   const { chromium } = await import('playwright');
@@ -16,6 +42,7 @@ async function getLocalHtml(url: string, cookies?: string): Promise<string> {
       ],
     });
   }
+  resetIdleTimer();
 
   const context: BrowserContext = await browserInstance.newContext({
     userAgent:
@@ -28,19 +55,8 @@ async function getLocalHtml(url: string, cookies?: string): Promise<string> {
 
   if (cookies) {
     try {
-      const parsed = cookies.split(';').filter(Boolean).map((pair) => {
-        const [name, ...rest] = pair.trim().split('=');
-        return { name: name.trim(), value: rest.join('=').trim() };
-      });
       const domain = new URL(url).hostname;
-      await context.addCookies(
-        parsed.map((c) => ({
-          name: c.name,
-          value: c.value,
-          domain,
-          path: '/',
-        })),
-      );
+      await context.addCookies(parseCookies(cookies, domain));
     } catch {
       // cookie setting failed silently
     }
@@ -61,19 +77,27 @@ async function getCloudHtml(url: string, cookies?: string): Promise<string> {
     process.env.BROWSERLESS_URL || 'https://chrome.browserless.io';
   const token = process.env.BROWSERLESS_API_KEY;
 
+  const body: Record<string, unknown> = {
+    url,
+    options: {
+      waitFor: 5000,
+      waitUntil: 'networkidle',
+    },
+  };
+
+  if (cookies) {
+    try {
+      const domain = new URL(url).hostname;
+      body.options = { ...(body.options as Record<string, unknown>), cookies: parseCookies(cookies, domain) };
+    } catch {
+      // cookie parsing failed
+    }
+  }
+
   const response = await fetch(`${baseUrl}/content?token=${token}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      url,
-      options: {
-        waitFor: 5000,
-        waitUntil: 'networkidle',
-        ...(cookies
-          ? { cookies: [{ name: 'Cookie', value: cookies }] }
-          : {}),
-      },
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {

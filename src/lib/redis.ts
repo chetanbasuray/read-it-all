@@ -1,6 +1,7 @@
 import { kv } from '@vercel/kv';
 import type { ArticleData } from './scraper';
 import { hashUrl } from './utils';
+import { sanitizeHtml } from './sanitize';
 
 const CACHE_TTL = 60 * 60 * 24;
 
@@ -26,7 +27,8 @@ export async function setCachedArticle(url: string, article: ArticleData): Promi
   if (!isRedisConfigured) return;
   try {
     const key = getCacheKey(url);
-    await kv.set(key, article, { ex: CACHE_TTL });
+    const sanitized = { ...article, content: sanitizeHtml(article.content) };
+    await kv.set(key, sanitized, { ex: CACHE_TTL });
   } catch {
     // Cache failure is non-critical
   }

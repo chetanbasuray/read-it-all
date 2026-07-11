@@ -2,6 +2,7 @@ import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
 import * as cheerio from 'cheerio';
 import { renderPage, closeBrowser } from './browser';
+import { sanitizeHtml } from './sanitize';
 
 export interface ArticleData {
   title: string;
@@ -64,11 +65,13 @@ export function extractFromJsonLd(
         ) {
           return {
             title: item.headline || item.title || 'Untitled',
-            content: item.articleBody
-              .split('\n')
-              .filter(Boolean)
-              .map((p: string) => `<p>${p}</p>`)
-              .join(''),
+            content: sanitizeHtml(
+              item.articleBody
+                .split('\n')
+                .filter(Boolean)
+                .map((p: string) => `<p>${p}</p>`)
+                .join(''),
+            ),
             textContent: item.articleBody,
             byline: item.author?.name || null,
             image:
@@ -86,7 +89,7 @@ export function extractFromJsonLd(
   return null;
 }
 
-export function extractFirstImage(html: string): string | null {
+export function extractFirstImage(html: string, baseUrl: string): string | null {
   const $ = cheerio.load(html);
   const ogImage = $('meta[property="og:image"]').attr('content');
   if (ogImage) return ogImage;
@@ -97,7 +100,7 @@ export function extractFirstImage(html: string): string | null {
   )
     .first()
     .attr('src');
-  if (firstImg) return new URL(firstImg, 'https://placeholder.com').href;
+  if (firstImg) return new URL(firstImg, baseUrl).href;
   return null;
 }
 
@@ -270,11 +273,11 @@ export function parseWithReadability(html: string, url: string): ArticleData | n
     if (article && article.content && article.content.length > 200) {
       return {
         title: article.title || extractTitle(html) || 'Untitled',
-        content: article.content,
+        content: sanitizeHtml(article.content),
         textContent: article.textContent || '',
         excerpt: article.excerpt || article.textContent?.substring(0, 200) || '',
         byline: article.byline || extractAuthor(html) || null,
-        image: extractFirstImage(html),
+        image: extractFirstImage(html, url),
         url,
       };
     }
@@ -297,7 +300,7 @@ function buildArticleFromMetadata(
       textContent: content.replace(/<[^>]*>/g, ''),
       excerpt: content.replace(/<[^>]*>/g, '').substring(0, 200),
       byline: extractAuthor(html),
-      image: extractFirstImage(html),
+      image: extractFirstImage(html, url),
       url,
     };
   }
@@ -400,7 +403,7 @@ export async function scrapeArticle(
           textContent: jsonld.textContent || '',
           excerpt: jsonld.textContent?.substring(0, 200) || '',
           byline: jsonld.byline || extractAuthor(html) || null,
-          image: jsonld.image || extractFirstImage(html),
+          image: jsonld.image || extractFirstImage(html, url),
           url,
         };
       }
@@ -436,7 +439,7 @@ export async function scrapeArticle(
               textContent: jsonld.textContent || '',
               excerpt: jsonld.textContent?.substring(0, 200) || '',
               byline: jsonld.byline || null,
-              image: jsonld.image || extractFirstImage(html),
+              image: jsonld.image || extractFirstImage(html, url),
               url,
             };
           }
@@ -463,7 +466,7 @@ export async function scrapeArticle(
           textContent: jsonld.textContent || '',
           excerpt: jsonld.textContent?.substring(0, 200) || '',
           byline: jsonld.byline || extractAuthor(browserHtml) || null,
-          image: jsonld.image || extractFirstImage(browserHtml),
+          image: jsonld.image || extractFirstImage(browserHtml, url),
           url,
         };
       }
@@ -474,7 +477,7 @@ export async function scrapeArticle(
       `Browser rendering failed: ${e instanceof Error ? e.message : 'unknown error'}`,
     );
   } finally {
-    closeBrowser().catch(() => {});
+    // Browser instance is a module-level singleton managed by browser.ts — don't close it here
   }
 
   const googleHtml = await fetchFromGoogleCache(url);
@@ -490,7 +493,7 @@ export async function scrapeArticle(
         textContent: jsonld.textContent || '',
         excerpt: jsonld.textContent?.substring(0, 200) || '',
         byline: jsonld.byline || null,
-        image: jsonld.image || extractFirstImage(googleHtml),
+        image: jsonld.image || extractFirstImage(googleHtml, url),
         url,
       };
     }
@@ -511,7 +514,7 @@ export async function scrapeArticle(
         textContent: jsonld.textContent || '',
         excerpt: jsonld.textContent?.substring(0, 200) || '',
         byline: jsonld.byline || null,
-        image: jsonld.image || extractFirstImage(waybackHtml),
+        image: jsonld.image || extractFirstImage(waybackHtml, url),
         url,
       };
     }

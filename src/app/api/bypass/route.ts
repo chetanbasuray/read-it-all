@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { scrapeArticle, ScrapeError } from '@/lib/scraper';
 import { getCachedArticle, setCachedArticle } from '@/lib/redis';
 import { hashUrl } from '@/lib/utils';
+import { validateUrl } from '@/lib/urlSafety';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,6 +25,15 @@ export async function POST(request: NextRequest) {
 
     if (!['http:', 'https:'].includes(new URL(normalizedUrl).protocol)) {
       return NextResponse.json({ error: 'Only http and https URLs are supported' }, { status: 400 });
+    }
+
+    try {
+      await validateUrl(normalizedUrl);
+    } catch (e) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : 'URL validation failed' },
+        { status: 400 },
+      );
     }
 
     if (!cookies) {

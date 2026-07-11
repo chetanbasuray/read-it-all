@@ -8,6 +8,7 @@ import {
 } from '@/lib/scraper';
 import { setCachedArticle, getCachedArticle, getArticleViews } from '@/lib/redis';
 import { hashUrl } from '@/lib/utils';
+import { sanitizeHtml } from '@/lib/sanitize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -96,7 +97,7 @@ export async function POST(request: NextRequest) {
               textContent: jsonld.textContent || '',
               excerpt: jsonld.textContent?.substring(0, 200) || '',
               byline: jsonld.byline || extractAuthor(html) || null,
-              image: jsonld.image || extractFirstImage(html),
+              image: jsonld.image || extractFirstImage(html, normalizedUrl),
               url: normalizedUrl,
             };
           }
@@ -110,6 +111,8 @@ export async function POST(request: NextRequest) {
         { status: 422, headers: corsHeaders },
       );
     }
+
+    article.content = sanitizeHtml(article.content);
 
     const existing = await getCachedArticle(normalizedUrl);
     const id = hashUrl(normalizedUrl);

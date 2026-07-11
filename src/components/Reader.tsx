@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useTheme } from './ThemeProvider';
 
 interface ReaderProps {
@@ -22,6 +22,19 @@ const FONT_SIZES = ['text-sm', 'text-base', 'text-lg', 'text-xl'] as const;
 export function Reader({ article, onBack }: ReaderProps) {
   const { theme, toggleTheme } = useTheme();
   const [fontSizeIndex, setFontSizeIndex] = useState(2);
+  const [copied, setCopied] = useState(false);
+
+  const shareLink = useCallback(() => {
+    const url = window.location.href;
+    if (navigator.share) {
+      navigator.share({ title: article.title, url }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(url).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }).catch(() => {});
+    }
+  }, [article.title]);
 
   const decreaseFont = () => setFontSizeIndex((i) => Math.max(0, i - 1));
   const increaseFont = () => setFontSizeIndex((i) => Math.min(FONT_SIZES.length - 1, i + 1));
@@ -141,6 +154,13 @@ export function Reader({ article, onBack }: ReaderProps) {
                   {article.views} {article.views === 1 ? 'view' : 'views'}
                 </span>
               )}
+              <button
+                onClick={shareLink}
+                className="text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap"
+                title="Share link"
+              >
+                {copied ? 'Copied!' : 'Share'}
+              </button>
             </div>
           </header>
 

@@ -32,9 +32,10 @@ function parseCookies(cookieString: string, domain: string): { name: string; val
 let _chromium: any = null;
 async function getChromium() {
   if (!_chromium) {
-    const { createRequire } = await import('node:module');
-    const myRequire = createRequire(import.meta.url);
-    _chromium = myRequire('playwright').chromium;
+    const pw = await Function(
+      'return import("playwright")',
+    )() as { chromium: any };
+    _chromium = pw.chromium;
   }
   return _chromium;
 }

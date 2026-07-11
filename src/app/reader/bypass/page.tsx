@@ -2,21 +2,7 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Reader } from '@/components/Reader';
 import Link from 'next/link';
-
-interface ArticleData {
-  id?: string;
-  title: string;
-  content: string;
-  textContent: string;
-  excerpt: string;
-  byline: string | null;
-  image: string | null;
-  url: string;
-  cached: boolean;
-  views?: number;
-}
 
 const TRACKING_PARAMS = new Set([
   'utm_source','utm_medium','utm_campaign','utm_term','utm_content','utm_id',
@@ -48,7 +34,6 @@ async function sha256Hex(input: string): Promise<string> {
 function BypassInner() {
   const searchParams = useSearchParams();
   const url = searchParams.get('url');
-  const [article, setArticle] = useState<ArticleData | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [retry, setRetry] = useState(0);
@@ -67,15 +52,22 @@ function BypassInner() {
       const hashHex = await sha256Hex(cleanTrackingParams(u));
       const id = hashHex.substring(0, 16);
 
+      let res = await fetch(`/api/article/${id}`);
+      if (!res.ok) {
+        await fetch('/api/bypass', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: u }),
+        });
+      }
+
       for (let i = 0; i < 30; i++) {
         if (cancelled) return;
         try {
-          const res = await fetch(`/api/article/${id}`);
+          res = await fetch(`/api/article/${id}`);
           if (res.ok) {
-            const data = await res.json();
             if (!cancelled) {
-              setArticle(data);
-              setLoading(false);
+              window.location.href = `/reader/${id}`;
             }
             return;
           }
@@ -124,14 +116,7 @@ function BypassInner() {
     );
   }
 
-  if (!article) return null;
-
-  return (
-    <Reader
-      article={article}
-      onBack={() => (window.location.href = '/')}
-    />
-  );
+  return null;
 }
 
 export default function BypassPage() {

@@ -11,6 +11,7 @@ export interface ArticleData {
   byline: string | null;
   image: string | null;
   url: string;
+  views?: number;
 }
 
 export class ScrapeError extends Error {

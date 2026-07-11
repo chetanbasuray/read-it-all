@@ -13,6 +13,7 @@ interface ArticleData {
   image: string | null;
   url: string;
   cached: boolean;
+  views?: number;
 }
 
 function AcceptInner() {

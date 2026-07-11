@@ -14,6 +14,7 @@ interface ArticleData {
   image: string | null;
   url: string;
   cached: boolean;
+  views?: number;
 }
 
 async function sha256Hex(input: string): Promise<string> {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getArticleById } from '@/lib/redis';
+import { getArticleById, getArticleViews, incrementArticleViews } from '@/lib/redis';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,10 +17,13 @@ export async function GET(
       );
     }
 
+    const views = await incrementArticleViews(params.id);
+
     return NextResponse.json({
       id: params.id,
       ...article,
       cached: true,
+      views,
     });
   } catch (error) {
     const message =

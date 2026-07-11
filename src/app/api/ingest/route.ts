@@ -118,6 +118,7 @@ export async function POST(request: NextRequest) {
         id: hashUrl(normalizedUrl),
         ...article,
         cached: false,
+        views: 0,
       },
       { headers: corsHeaders },
     );

@@ -12,6 +12,7 @@ interface ReaderProps {
     excerpt: string;
     url: string;
     cached?: boolean;
+    views?: number;
   };
   onBack: () => void;
 }
@@ -133,6 +134,11 @@ export function Reader({ article, onBack }: ReaderProps) {
                     }`}
                   />
                   {article.cached ? 'Cached' : 'Fresh scrape'}
+                </span>
+              )}
+              {article.views !== undefined && (
+                <span className="text-xs text-gray-400 dark:text-gray-500">
+                  {article.views} {article.views === 1 ? 'view' : 'views'}
                 </span>
               )}
             </div>

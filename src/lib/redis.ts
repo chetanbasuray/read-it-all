@@ -40,3 +40,22 @@ export async function getArticleById(id: string): Promise<ArticleData | null> {
     return null;
   }
 }
+
+export async function getArticleViews(id: string): Promise<number> {
+  if (!isRedisConfigured) return 0;
+  try {
+    const views = await kv.get<number>(`views:${id}`);
+    return views ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+export async function incrementArticleViews(id: string): Promise<number> {
+  if (!isRedisConfigured) return 0;
+  try {
+    return await kv.incr(`views:${id}`);
+  } catch {
+    return 0;
+  }
+}

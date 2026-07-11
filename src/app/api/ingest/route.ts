@@ -7,7 +7,7 @@ import {
   extractAuthor,
 } from '@/lib/scraper';
 import { setCachedArticle, getCachedArticle, getArticleViews } from '@/lib/redis';
-import { hashUrl } from '@/lib/utils';
+import { hashUrl, cleanTrackingParams } from '@/lib/utils';
 import { sanitizeHtml } from '@/lib/sanitize';
 
 export const runtime = 'nodejs';
@@ -75,6 +75,8 @@ export async function POST(request: NextRequest) {
       url: string;
     } | null = null;
 
+    const canonicalUrl = cleanTrackingParams(normalizedUrl);
+
     if (content && content.length > 200) {
       article = {
         title: title || 'Untitled',
@@ -83,11 +85,11 @@ export async function POST(request: NextRequest) {
         excerpt: excerpt || (textContent || content.replace(/<[^>]*>/g, '')).substring(0, 200),
         byline: byline || null,
         image: image || null,
-        url: normalizedUrl,
+        url: canonicalUrl,
       };
     } else if (html && html.length >= 500) {
       article =
-        parseWithReadability(html, normalizedUrl) ||
+        parseWithReadability(html, canonicalUrl) ||
         (() => {
           const jsonld = extractFromJsonLd(html);
           if (jsonld && jsonld.content && jsonld.content.length > 200) {
@@ -97,8 +99,8 @@ export async function POST(request: NextRequest) {
               textContent: jsonld.textContent || '',
               excerpt: jsonld.textContent?.substring(0, 200) || '',
               byline: jsonld.byline || extractAuthor(html) || null,
-              image: jsonld.image || extractFirstImage(html, normalizedUrl),
-              url: normalizedUrl,
+              image: jsonld.image || extractFirstImage(html, canonicalUrl),
+              url: canonicalUrl,
             };
           }
           return null;
@@ -114,8 +116,8 @@ export async function POST(request: NextRequest) {
 
     article.content = sanitizeHtml(article.content);
 
-    const existing = await getCachedArticle(normalizedUrl);
-    const id = hashUrl(normalizedUrl);
+    const existing = await getCachedArticle(canonicalUrl);
+    const id = hashUrl(canonicalUrl);
 
     if (existing) {
       const views = await getArticleViews(id);
@@ -130,7 +132,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await setCachedArticle(normalizedUrl, article);
+    await setCachedArticle(canonicalUrl, article);
 
     return NextResponse.json(
       {

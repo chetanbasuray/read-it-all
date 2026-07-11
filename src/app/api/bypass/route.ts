@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { scrapeArticle, ScrapeError } from '@/lib/scraper';
 import { getCachedArticle, setCachedArticle } from '@/lib/redis';
-import { hashUrl } from '@/lib/utils';
+import { hashUrl, cleanTrackingParams } from '@/lib/utils';
 import { validateUrl } from '@/lib/urlSafety';
 
 export const runtime = 'nodejs';
@@ -36,25 +36,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const canonicalUrl = cleanTrackingParams(normalizedUrl);
+
     if (!cookies) {
-      const cached = await getCachedArticle(normalizedUrl);
+      const cached = await getCachedArticle(canonicalUrl);
       if (cached) {
         return NextResponse.json({
-          id: hashUrl(normalizedUrl),
+          id: hashUrl(canonicalUrl),
           ...cached,
           cached: true,
         });
       }
     }
 
-    const article = await scrapeArticle(normalizedUrl, cookies);
+    const article = await scrapeArticle(canonicalUrl, cookies);
     if (!cookies) {
-      await setCachedArticle(normalizedUrl, article);
+      await setCachedArticle(canonicalUrl, { ...article, url: canonicalUrl });
     }
 
     return NextResponse.json({
-      id: hashUrl(normalizedUrl),
+      id: hashUrl(canonicalUrl),
       ...article,
+      url: canonicalUrl,
       cached: false,
     });
   } catch (error) {

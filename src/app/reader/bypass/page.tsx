@@ -18,6 +18,25 @@ interface ArticleData {
   views?: number;
 }
 
+const TRACKING_PARAMS = new Set([
+  'utm_source','utm_medium','utm_campaign','utm_term','utm_content','utm_id',
+  'fbclid','gclid','dclid','gbraid','wbraid','msclkid','twclid','igshid',
+  'mc_cid','mc_eid','ref','ref_src','ref_url','link_source','taid','source',
+  'ei','yclid','_ga','_gl','trk','trkCampaign','sc_campaign','sc_channel',
+  'sc_content','sc_geo','sc_country','email',
+]);
+
+function cleanTrackingParams(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const clean = new URL(parsed.origin + parsed.pathname);
+    for (const [key, value] of parsed.searchParams) {
+      if (!TRACKING_PARAMS.has(key)) clean.searchParams.set(key, value);
+    }
+    return clean.href;
+  } catch { return url; }
+}
+
 async function sha256Hex(input: string): Promise<string> {
   const encoder = new TextEncoder();
   const data = encoder.encode(input);
@@ -45,7 +64,7 @@ function BypassInner() {
     const u: string = url!;
 
     async function start() {
-      const hashHex = await sha256Hex(u);
+      const hashHex = await sha256Hex(cleanTrackingParams(u));
       const id = hashHex.substring(0, 16);
 
       for (let i = 0; i < 30; i++) {

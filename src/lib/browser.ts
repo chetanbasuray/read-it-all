@@ -1,3 +1,5 @@
+import { validateUrl } from './urlSafety';
+
 type Browser = any;
 type BrowserContext = any;
 
@@ -32,6 +34,8 @@ function parseCookies(cookieString: string, domain: string): { name: string; val
 let _chromium: any = null;
 async function getChromium() {
   if (!_chromium) {
+    // Function()-wrapped import hides this from webpack's static bundler, which
+    // otherwise packages playwright's native binary loader in a way that breaks at runtime.
     const pw = await Function(
       'return import("playwright")',
     )() as { chromium: any };
@@ -65,6 +69,21 @@ async function getLocalHtml(url: string, cookies?: string): Promise<string> {
     },
   });
 
+  // a redirect or client-side navigation inside the page could otherwise steer
+  // this browser at an internal address that was never checked by validateUrl
+  await context.route('**/*', async (route: any) => {
+    const req = route.request();
+    if (req.isNavigationRequest()) {
+      try {
+        await validateUrl(req.url());
+      } catch {
+        await route.abort();
+        return;
+      }
+    }
+    await route.continue();
+  });
+
   if (cookies) {
     try {
       const domain = new URL(url).hostname;
@@ -84,6 +103,8 @@ async function getLocalHtml(url: string, cookies?: string): Promise<string> {
   return html;
 }
 
+// unlike getLocalHtml, redirects here are followed by Browserless itself, outside
+// our process, so validateUrl can't intercept a redirect to an internal address
 async function getCloudHtml(url: string, cookies?: string): Promise<string> {
   const baseUrl =
     process.env.BROWSERLESS_URL || 'https://chrome.browserless.io';

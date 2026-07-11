@@ -22,6 +22,7 @@ function ipInCIDR(ip: string, cidr: string): boolean {
 function isPrivateIP(ip: string): boolean {
   if (ip === '::1') return true;
   if (ip.startsWith('fe80:')) return true;
+  if (/^f[cd][0-9a-f]{2}:/i.test(ip)) return true;
   if (!isIP(ip)) return false;
 
   const v4Mapped = ip.includes('::ffff:') ? ip.split('::ffff:')[1] : ip;
@@ -47,7 +48,9 @@ export async function validateUrl(rawUrl: string): Promise<void> {
     throw new Error('Only http and https URLs are allowed');
   }
 
-  const hostname = parsed.hostname;
+  // URL.hostname keeps the brackets around an IPv6 literal (e.g. "[::1]"),
+  // which fails isIP() and dns.lookup() alike and would otherwise skip every check below.
+  const hostname = parsed.hostname.replace(/^\[(.*)\]$/, '$1');
 
   if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
     throw new Error(`URL resolves to a loopback address: ${hostname}`);
@@ -71,4 +74,26 @@ export async function validateUrl(rawUrl: string): Promise<void> {
     }
     throw new Error(`Could not resolve hostname: ${hostname}`);
   }
+}
+
+// fetch()'s own redirect: 'follow' never re-validates the target of a 3xx,
+// letting a validated URL redirect straight to an internal address; this
+// re-runs validateUrl on every hop instead of trusting the original URL alone.
+export async function safeFetch(
+  url: string,
+  init: RequestInit = {},
+  maxRedirects = 5,
+): Promise<Response> {
+  let currentUrl = url;
+  for (let hop = 0; hop <= maxRedirects; hop++) {
+    await validateUrl(currentUrl);
+    const response = await fetch(currentUrl, { ...init, redirect: 'manual' });
+    const location = response.headers.get('location');
+    if (response.status >= 300 && response.status < 400 && location) {
+      currentUrl = new URL(location, currentUrl).href;
+      continue;
+    }
+    return response;
+  }
+  throw new Error('Too many redirects');
 }

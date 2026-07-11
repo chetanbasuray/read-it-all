@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ScrapeError, extractFirstImage } from '@/lib/scraper';
 import { sanitizeHtml } from '@/lib/sanitize';
-import { validateUrl } from '@/lib/urlSafety';
+import { validateUrl, safeFetch } from '@/lib/urlSafety';
 
 vi.hoisted(() => {
   process.env.KV_URL = 'https://dummy-redis.example.com';
@@ -226,6 +226,53 @@ describe('validateUrl', () => {
 
   it('rejects invalid URLs', async () => {
     await expect(validateUrl('')).rejects.toThrow('Invalid URL');
+  });
+
+  it('rejects IPv6 unique local addresses', async () => {
+    await expect(validateUrl('http://[fd00::1]/')).rejects.toThrow('private IP');
+  });
+});
+
+describe('safeFetch', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('rejects a redirect to a private IP instead of following it', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(null, {
+        status: 302,
+        headers: { Location: 'http://169.254.169.254/latest/meta-data/' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(safeFetch('https://example.com/redirect')).rejects.toThrow('private IP');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('follows a redirect to another public URL', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(null, { status: 302, headers: { Location: 'https://example.com/final' } }),
+      )
+      .mockResolvedValueOnce(new Response('ok', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const res = await safeFetch('https://example.com/start');
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe('ok');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives up after too many redirects', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(null, { status: 302, headers: { Location: 'https://example.com/loop' } }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(safeFetch('https://example.com/loop')).rejects.toThrow('Too many redirects');
   });
 });
 

@@ -1,5 +1,6 @@
 import { lookup } from 'dns/promises';
 import { isIP } from 'net';
+import { regex } from 'shorol';
 
 function ipInCIDR(ip: string, cidr: string): boolean {
   const [rangeNet, bitsStr] = cidr.split('/');
@@ -22,7 +23,15 @@ function ipInCIDR(ip: string, cidr: string): boolean {
 function isPrivateIP(ip: string): boolean {
   if (ip === '::1') return true;
   if (ip.startsWith('fe80:')) return true;
-  if (/^f[cd][0-9a-f]{2}:/i.test(ip)) return true;
+  const ipv6ULA = regex()
+    .start()
+    .literal('f')
+    .anyOf(['c', 'd'])
+    .anyOf('0123456789abcdef')
+    .repeat(2)
+    .literal(':')
+    .toRegExp('i');
+  if (ipv6ULA.test(ip)) return true;
   if (!isIP(ip)) return false;
 
   const v4Mapped = ip.includes('::ffff:') ? ip.split('::ffff:')[1] : ip;

@@ -1,0 +1,258 @@
+{
+  "version": 1,
+  "files": {
+    "src/lib/browser.ts": {
+      "mtimeMs": 1783772578839.3235,
+      "hash": "52382f5f13646437a19fe946fb4ca3c64bd05bcf",
+      "signatures": [
+        {
+          "name": "renderPage",
+          "parameters": [
+            "url: string",
+            "cookies?: string"
+          ],
+          "returnType": ": Promise<string>",
+          "fullSignature": "renderPage(url: string, cookies?: string): Promise<string>",
+          "jsDocDescription": ""
+        },
+        {
+          "name": "closeBrowser",
+          "parameters": [],
+          "returnType": ": Promise<void>",
+          "fullSignature": "closeBrowser(): Promise<void>",
+          "jsDocDescription": ""
+        }
+      ]
+    },
+    "src/lib/redis.ts": {
+      "mtimeMs": 1783867935104.2705,
+      "hash": "c59b933ddecbe1a0c9e7538f4e6c8fbd134491ae",
+      "signatures": [
+        {
+          "name": "getCacheKey",
+          "parameters": [
+            "url: string"
+          ],
+          "returnType": ": string",
+          "fullSignature": "getCacheKey(url: string): string",
+          "jsDocDescription": ""
+        },
+        {
+          "name": "refreshIfStale",
+          "parameters": [
+            "article: CachedArticle"
+          ],
+          "returnType": ": Promise<void>",
+          "fullSignature": "refreshIfStale(article: CachedArticle): Promise<void>",
+          "jsDocDescription": ""
+        },
+        {
+          "name": "getCachedArticle",
+          "parameters": [
+            "url: string"
+          ],
+          "returnType": ": Promise<ArticleData | null>",
+          "fullSignature": "getCachedArticle(url: string): Promise<ArticleData | null>",
+          "jsDocDescription": ""
+        },
+        {
+          "name": "setCachedArticle",
+          "parameters": [
+            "url: string",
+            "article: ArticleData"
+          ],
+          "returnType": ": Promise<void>",
+          "fullSignature": "setCachedArticle(url: string, article: ArticleData): Promise<void>",
+          "jsDocDescription": ""
+        },
+        {
+          "name": "getArticleById",
+          "parameters": [
+            "id: string"
+          ],
+          "returnType": ": Promise<ArticleData | null>",
+          "fullSignature": "getArticleById(id: string): Promise<ArticleData | null>",
+          "jsDocDescription": ""
+        },
+        {
+          "name": "getUrlForId",
+          "parameters": [
+            "id: string"
+          ],
+          "returnType": ": Promise<string | null>",
+          "fullSignature": "getUrlForId(id: string): Promise<string | null>",
+          "jsDocDescription": ""
+        },
+        {
+          "name": "getArticleViews",
+          "parameters": [
+            "id: string"
+          ],
+          "returnType": ": Promise<number>",
+          "fullSignature": "getArticleViews(id: string): Promise<number>",
+          "jsDocDescription": ""
+        },
+        {
+          "name": "incrementArticleViews",
+          "parameters": [
+            "id: string"
+          ],
+          "returnType": ": Promise<number>",
+          "fullSignature": "incrementArticleViews(id: string): Promise<number>",
+          "jsDocDescription": ""
+        }
+      ]
+    },
+    "src/lib/sanitize.ts": {
+      "mtimeMs": 1783770234183.198,
+      "hash": "91cc0f25fc12e99e2c51e4da01f076b4a64fb6ec",
+      "signatures": [
+        {
+          "name": "sanitizeHtml",
+          "parameters": [
+            "dirty: string"
+          ],
+          "returnType": ": string",
+          "fullSignature": "sanitizeHtml(dirty: string): string",
+          "jsDocDescription": ""
+        }
+      ]
+    },
+    "src/lib/scraper.ts": {
+      "mtimeMs": 1783867935104.6104,
+      "hash": "076553a3840d21d8703491724db603486ea564fb",
+      "signatures": [
+        {
+          "name": "ArticleData",
+          "parameters": [
+            "title: string;",
+            "content: string;",
+            "textContent: string;",
+            "excerpt: string;",
+            "byline: string | null;",
+            "image: string | null;",
+            "url: string;",
+            "views?: number;"
+          ],
+          "returnType": "",
+          "fullSignature": "interface ArticleData { title: string;; content: string;; textContent: string;; excerpt: string;; byline: string | null;; image: string | null;; url: string;; views?: number; }",
+          "jsDocDescription": ""
+        },
+        {
+          "name": "ScrapeError",
+          "parameters": [],
+          "returnType": "",
+          "fullSignature": "class ScrapeError",
+          "jsDocDescription": ""
+        },
+        {
+          "name": "extractFromJsonLd",
+          "parameters": [
+            "html: string"
+          ],
+          "returnType": ": Pick<ArticleData, 'title' | 'content' | 'textContent' | 'byline' | 'image'> | null",
+          "fullSignature": "extractFromJsonLd(html: string): Pick<ArticleData, 'title' | 'content' | 'textContent' | 'byline' | 'image'> | null",
+          "jsDocDescription": ""
+        },
+        {
+          "name": "extractFirstImage",
+          "parameters": [
+            "html: string",
+            "baseUrl: string"
+          ],
+          "returnType": ": string | null",
+          "fullSignature": "extractFirstImage(html: string, baseUrl: string): string | null",
+          "jsDocDescription": ""
+        },
+        {
+          "name": "extractTitle",
+          "parameters": [
+            "html: string"
+          ],
+          "returnType": ": string | null",
+          "fullSignature": "extractTitle(html: string): string | null",
+          "jsDocDescription": ""
+        },
+        {
+          "name": "extractAuthor",
+          "parameters": [
+            "html: string"
+          ],
+          "returnType": ": string | null",
+          "fullSignature": "extractAuthor(html: string): string | null",
+          "jsDocDescription": ""
+        },
+        {
+          "name": "parseWithReadability",
+          "parameters": [
+            "html: string",
+            "url: string"
+          ],
+          "returnType": ": ArticleData | null",
+          "fullSignature": "parseWithReadability(html: string, url: string): ArticleData | null",
+          "jsDocDescription": ""
+        },
+        {
+          "name": "scrapeArticle",
+          "parameters": [
+            "url: string",
+            "cookies?: string"
+          ],
+          "returnType": ": Promise<ArticleData>",
+          "fullSignature": "scrapeArticle(url: string, cookies?: string): Promise<ArticleData>",
+          "jsDocDescription": ""
+        }
+      ]
+    },
+    "src/lib/urlSafety.ts": {
+      "mtimeMs": 1783884437747.162,
+      "hash": "dbec85cfda5e2652ebaf6768d091507d266d8a0b",
+      "signatures": [
+        {
+          "name": "validateUrl",
+          "parameters": [
+            "rawUrl: string"
+          ],
+          "returnType": ": Promise<void>",
+          "fullSignature": "validateUrl(rawUrl: string): Promise<void>",
+          "jsDocDescription": ""
+        },
+        {
+          "name": "safeFetch",
+          "parameters": [
+            "url: string",
+            "init: RequestInit = {}",
+            "maxRedirects = 5"
+          ],
+          "returnType": ": Promise<Response>",
+          "fullSignature": "safeFetch(url: string, init: RequestInit = {}, maxRedirects = 5): Promise<Response>",
+          "jsDocDescription": ""
+        }
+      ]
+    },
+    "src/lib/utils.ts": {
+      "mtimeMs": 1783790755721.2378,
+      "hash": "d0ffd729a78045be976603394a022683350d3426",
+      "signatures": [
+        {
+          "name": "cleanTrackingParams",
+          "parameters": [
+            "url: string"
+          ],
+          "returnType": ": string",
+          "fullSignature": "cleanTrackingParams(url: string): string",
+          "jsDocDescription": ""
+        },
+        {
+          "name": "hashUrl",
+          "parameters": [
+            "url: string"
+          ],
+          "returnType": ": string",
+          "fullSignature": "hashUrl(url: string): string",
+          "jsDocDescription": ""
+        }
+      ]
+    }
+  }
+}

@@ -82,7 +82,8 @@ describe('POST /api/bypass', () => {
     expect(data.error).toBe('Scraping failed');
   });
 
-  it('returns scrape details with 502 when ScrapeError is thrown', async () => {
+  it('logs scrape details server-side but does not expose them in the response', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.mocked(scrapeArticle).mockRejectedValue(
       new ScrapeError('Could not extract content', [
         'HTTP 403 with Googlebot',
@@ -98,11 +99,19 @@ describe('POST /api/bypass', () => {
 
     expect(response.status).toBe(502);
     expect(data.error).toBe('Could not extract content');
-    expect(data.details).toEqual([
-      'HTTP 403 with Googlebot',
-      'HTTP 403 with Bingbot',
-      'Wayback Machine has no accessible snapshots',
-    ]);
+    expect(data.details).toBeUndefined();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      'scrape failed',
+      expect.objectContaining({
+        details: [
+          'HTTP 403 with Googlebot',
+          'HTTP 403 with Bingbot',
+          'Wayback Machine has no accessible snapshots',
+        ],
+      }),
+    );
+
+    consoleSpy.mockRestore();
   });
 
   it('returns article data on successful scrape', async () => {

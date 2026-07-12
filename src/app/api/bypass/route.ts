@@ -62,10 +62,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     if (error instanceof ScrapeError) {
-      return NextResponse.json(
-        { error: error.message, details: error.details },
-        { status: 502 },
-      );
+      // fallback-chain internals (per-UA HTTP codes, render errors) are for our own debugging, not the end user
+      console.error('scrape failed', { message: error.message, details: error.details });
+      return NextResponse.json({ error: error.message }, { status: 502 });
     }
     const message =
       error instanceof Error ? error.message : 'An unexpected error occurred';

@@ -6,7 +6,6 @@ import { UrlInput } from '@/components/UrlInput';
 
 interface ApiError {
   error: string;
-  details?: string[];
 }
 
 export default function HomePage() {
@@ -28,7 +27,7 @@ export default function HomePage() {
       const data = await response.json();
 
       if (!response.ok) {
-        setError({ error: data.error || 'Failed to extract article', details: data.details });
+        setError({ error: data.error || 'Failed to extract article' });
         return;
       }
 
@@ -62,19 +61,6 @@ export default function HomePage() {
               <p className="text-red-600 dark:text-red-400 text-sm font-medium">
                 {error.error}
               </p>
-              {error.details && error.details.length > 0 && (
-                <ul className="mt-2 space-y-1">
-                  {error.details.map((d, i) => (
-                    <li
-                      key={i}
-                      className="text-red-500 dark:text-red-400 text-xs flex items-start gap-1.5"
-                    >
-                      <span className="mt-0.5 shrink-0">&bull;</span>
-                      <span>{d}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
             </div>
           )}
 

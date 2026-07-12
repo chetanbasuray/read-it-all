@@ -52,6 +52,7 @@ Issues labeled [`good first issue`](https://github.com/chetanbasuray/read-it-all
 - Branch names: `feat/<description>` or `fix/<description>`.
 - Commit messages and PR titles: [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, `build:`, `ci:`, `perf:`, `style:`, `revert:`).
 - `main` requires a pull request; CI (lint, test, build) must pass before merging.
+- Deploys are skipped for `docs:`/`ci:`/`chore:`/`style:`/`test:` commits via Vercel's Ignored Build Step (`scripts/vercel-ignore-build.sh`), since those do not change runtime behavior.
 
 ## License
 

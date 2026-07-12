@@ -528,16 +528,15 @@ export async function scrapeArticle(
 
   if (allBlocked) {
     throw new ScrapeError(
-      'This site uses advanced anti-bot protection (DataDome, Cloudflare, etc.) that blocks all automated requests. ' +
-      'The article content is served exclusively through JavaScript and requires a valid subscription or session. ' +
-      'Try using a browser extension like "Bypass Paywalls" or access the article through Google News / Apple News.',
+      'This site is not one we can access well yet, we are working on improving support for it. ' +
+      'In the meantime, try a browser extension like "Bypass Paywalls," or check Google News / Apple News for this article.',
       errors,
     );
   }
 
   throw new ScrapeError(
-    'Could not extract full article content. The article text may be loaded dynamically via JavaScript, ' +
-    'or the page structure is not recognized. Try the original URL in your browser.',
+    'We could not extract the full article from this page yet, we are working on improving support for sites like this. ' +
+    'Try opening the original URL directly in your browser.',
     errors,
   );
 }

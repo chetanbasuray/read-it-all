@@ -155,6 +155,7 @@ describe('POST /api/bypass', () => {
       byline: 'Cached Author',
       image: null,
       url: 'https://example.com/cached',
+      scrapedAt: Date.now(),
     };
 
     vi.mocked(kv.get).mockResolvedValue(cachedArticle);
@@ -350,5 +351,82 @@ describe('generateMetadata (reader/[id])', () => {
 
     const metadata = await generateMetadata({ params: { id: 'missing' } });
     expect(metadata.title).toBe('Article not found - Read It All');
+  });
+});
+
+describe('refreshIfStale', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function fakeArticle(scrapedAt: number) {
+    return {
+      title: 'Old Title',
+      content: '<p>old</p>',
+      textContent: 'old',
+      excerpt: 'old',
+      byline: null,
+      image: null,
+      url: 'https://example.com/refresh-me',
+      scrapedAt,
+    };
+  }
+
+  it('does nothing for a recently scraped article', async () => {
+    const { kv } = await import('@vercel/kv');
+    const { refreshIfStale } = await import('@/lib/redis');
+
+    await refreshIfStale(fakeArticle(Date.now()));
+
+    expect(kv.set).not.toHaveBeenCalled();
+    expect(scrapeArticle).not.toHaveBeenCalled();
+  });
+
+  it('re-scrapes and updates the cache for a stale article once the lock is acquired', async () => {
+    const { kv } = await import('@vercel/kv');
+    const { refreshIfStale } = await import('@/lib/redis');
+    const eightDaysAgo = Date.now() - 8 * 24 * 60 * 60 * 1000;
+
+    vi.mocked(kv.set).mockResolvedValueOnce('OK');
+    vi.mocked(scrapeArticle).mockResolvedValueOnce({
+      title: 'New Title',
+      content: '<p>new</p>',
+      textContent: 'new',
+      excerpt: 'new',
+      byline: null,
+      image: null,
+      url: 'https://example.com/refresh-me',
+    });
+
+    await refreshIfStale(fakeArticle(eightDaysAgo));
+
+    expect(scrapeArticle).toHaveBeenCalledWith('https://example.com/refresh-me');
+    expect(kv.set).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(kv.set).mock.calls[0][2]).toMatchObject({ nx: true });
+  });
+
+  it('skips the re-scrape when another instance already holds the lock', async () => {
+    const { kv } = await import('@vercel/kv');
+    const { refreshIfStale } = await import('@/lib/redis');
+    const eightDaysAgo = Date.now() - 8 * 24 * 60 * 60 * 1000;
+
+    vi.mocked(kv.set).mockResolvedValueOnce(null);
+
+    await refreshIfStale(fakeArticle(eightDaysAgo));
+
+    expect(scrapeArticle).not.toHaveBeenCalled();
+    expect(kv.set).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats a missing scrapedAt (pre-migration cache entry) as stale', async () => {
+    const { kv } = await import('@vercel/kv');
+    const { refreshIfStale } = await import('@/lib/redis');
+
+    vi.mocked(kv.set).mockResolvedValueOnce('OK');
+    vi.mocked(scrapeArticle).mockResolvedValueOnce(fakeArticle(Date.now()));
+
+    await refreshIfStale({ ...fakeArticle(Date.now()), scrapedAt: undefined as unknown as number });
+
+    expect(scrapeArticle).toHaveBeenCalled();
   });
 });

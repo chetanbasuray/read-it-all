@@ -1,4 +1,4 @@
-name: PR Title Lint
+name: PR Lint
 
 on:
   pull_request:
@@ -24,3 +24,13 @@ jobs:
             perf
             style
             revert
+
+  lint-branch-name:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check branch name is feat/* or fix/*
+        run: |
+          if [[ ! "${{ github.head_ref }}" =~ ^(feat|fix)/.+ ]]; then
+            echo "Branch '${{ github.head_ref }}' must start with feat/ or fix/"
+            exit 1
+          fi

@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { Reader } from '@/components/Reader';
-import { getArticleById, getArticleViews } from '@/lib/redis';
+import { getArticleById, getArticleViews, getUrlForId } from '@/lib/redis';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,6 +45,11 @@ export default async function ReaderPage({
   const article = await getArticleById(params.id);
 
   if (!article) {
+    const url = await getUrlForId(params.id);
+    if (url) {
+      redirect(`/reader/bypass?url=${encodeURIComponent(url)}`);
+    }
+
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="text-center">

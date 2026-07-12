@@ -13,7 +13,14 @@ vi.mock('@vercel/kv', () => ({
   kv: {
     get: vi.fn().mockResolvedValue(null),
     set: vi.fn().mockResolvedValue('OK'),
+    expire: vi.fn().mockResolvedValue(1),
   },
+}));
+
+vi.mock('next/navigation', () => ({
+  redirect: vi.fn((url: string) => {
+    throw new Error(`NEXT_REDIRECT:${url}`);
+  }),
 }));
 
 vi.mock('@/lib/scraper', async () => {
@@ -142,7 +149,7 @@ describe('POST /api/bypass', () => {
 
     await POST(createRequest({ url: 'https://example.com/article' }));
 
-    expect(kv.set).toHaveBeenCalledOnce();
+    expect(kv.set).toHaveBeenCalledTimes(2);
   });
 
   it('returns cached article without scraping', async () => {
@@ -401,7 +408,7 @@ describe('refreshIfStale', () => {
     await refreshIfStale(fakeArticle(eightDaysAgo));
 
     expect(scrapeArticle).toHaveBeenCalledWith('https://example.com/refresh-me');
-    expect(kv.set).toHaveBeenCalledTimes(2);
+    expect(kv.set).toHaveBeenCalledTimes(3);
     expect(vi.mocked(kv.set).mock.calls[0][2]).toMatchObject({ nx: true });
   });
 
@@ -428,5 +435,58 @@ describe('refreshIfStale', () => {
     await refreshIfStale({ ...fakeArticle(Date.now()), scrapedAt: undefined as unknown as number });
 
     expect(scrapeArticle).toHaveBeenCalled();
+  });
+});
+
+describe('getUrlForId', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns the mapped url when present', async () => {
+    const { kv } = await import('@vercel/kv');
+    const { getUrlForId } = await import('@/lib/redis');
+
+    vi.mocked(kv.get).mockResolvedValueOnce({ url: 'https://example.com/permanent' });
+
+    await expect(getUrlForId('some-id')).resolves.toBe('https://example.com/permanent');
+  });
+
+  it('returns null when no mapping exists', async () => {
+    const { kv } = await import('@vercel/kv');
+    const { getUrlForId } = await import('@/lib/redis');
+
+    vi.mocked(kv.get).mockResolvedValueOnce(null);
+
+    await expect(getUrlForId('unknown-id')).resolves.toBeNull();
+  });
+});
+
+describe('ReaderPage recovery from expired content', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('redirects to /reader/bypass when content expired but the url mapping survives', async () => {
+    const { kv } = await import('@vercel/kv');
+    const ReaderPageModule = await import('@/app/reader/[id]/page');
+
+    vi.mocked(kv.get)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ url: 'https://example.com/expired-article' });
+
+    await expect(
+      ReaderPageModule.default({ params: { id: 'expired-id' } }),
+    ).rejects.toThrow('NEXT_REDIRECT:/reader/bypass?url=https%3A%2F%2Fexample.com%2Fexpired-article');
+  });
+
+  it('shows the not-found page when neither content nor mapping exist', async () => {
+    const { kv } = await import('@vercel/kv');
+    const ReaderPageModule = await import('@/app/reader/[id]/page');
+
+    vi.mocked(kv.get).mockResolvedValue(null);
+
+    const result = await ReaderPageModule.default({ params: { id: 'totally-unknown' } });
+    expect(result).toBeTruthy();
   });
 });

@@ -5,8 +5,8 @@ import { scrapeArticle } from './scraper';
 import { hashUrl } from './utils';
 import { sanitizeHtml } from './sanitize';
 
-// long enough that a shared link effectively never expires, while still bounding storage for content nobody revisits
-const CACHE_TTL = 60 * 60 * 24 * 365;
+// sliding window: bumped on every read, so popular articles stay cached and cold ones get reclaimed
+const CONTENT_TTL = 60 * 60 * 24 * 60;
 // how old a cached scrape can get before a visit triggers a background re-scrape
 const STALE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
 // short-lived distributed lock so concurrent visits to the same stale article don't all trigger a re-scrape
@@ -22,6 +22,19 @@ const isRedisConfigured = !!(
 
 export function getCacheKey(url: string): string {
   return `article:${hashUrl(url)}`;
+}
+
+// permanent: lets an expired content entry be recovered by re-scraping the same url under the same id
+function getMappingKey(id: string): string {
+  return `mapping:${id}`;
+}
+
+async function touchTtl(url: string): Promise<void> {
+  try {
+    await kv.expire(getCacheKey(url), CONTENT_TTL);
+  } catch {
+    // best-effort; a failed bump just means this entry may expire a bit early
+  }
 }
 
 export async function refreshIfStale(article: CachedArticle): Promise<void> {
@@ -46,7 +59,10 @@ export async function getCachedArticle(url: string): Promise<ArticleData | null>
   try {
     const key = getCacheKey(url);
     const article = await kv.get<CachedArticle>(key);
-    if (article) waitUntil(refreshIfStale(article));
+    if (article) {
+      waitUntil(touchTtl(article.url));
+      waitUntil(refreshIfStale(article));
+    }
     return article;
   } catch {
     return null;
@@ -56,9 +72,10 @@ export async function getCachedArticle(url: string): Promise<ArticleData | null>
 export async function setCachedArticle(url: string, article: ArticleData): Promise<void> {
   if (!isRedisConfigured) return;
   try {
-    const key = getCacheKey(url);
+    const id = hashUrl(url);
     const sanitized: CachedArticle = { ...article, content: sanitizeHtml(article.content), scrapedAt: Date.now() };
-    await kv.set(key, sanitized, { ex: CACHE_TTL });
+    await kv.set(`article:${id}`, sanitized, { ex: CONTENT_TTL });
+    await kv.set(getMappingKey(id), { url });
   } catch {
     // Cache failure is non-critical
   }
@@ -68,8 +85,22 @@ export async function getArticleById(id: string): Promise<ArticleData | null> {
   if (!isRedisConfigured) return null;
   try {
     const article = await kv.get<CachedArticle>(`article:${id}`);
-    if (article) waitUntil(refreshIfStale(article));
+    if (article) {
+      waitUntil(touchTtl(article.url));
+      waitUntil(refreshIfStale(article));
+    }
     return article;
+  } catch {
+    return null;
+  }
+}
+
+// survives content eviction, so an expired link can be silently re-scraped under the same id
+export async function getUrlForId(id: string): Promise<string | null> {
+  if (!isRedisConfigured) return null;
+  try {
+    const mapping = await kv.get<{ url: string }>(getMappingKey(id));
+    return mapping?.url ?? null;
   } catch {
     return null;
   }

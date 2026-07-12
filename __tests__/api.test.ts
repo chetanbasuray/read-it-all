@@ -317,3 +317,38 @@ describe('extractFirstImage', () => {
     expect(result).toBeNull();
   });
 });
+
+describe('generateMetadata (reader/[id])', () => {
+  it('returns article-specific OG tags when cached', async () => {
+    const { kv } = await import('@vercel/kv');
+    const { generateMetadata } = await import('@/app/reader/[id]/page');
+
+    vi.mocked(kv.get).mockResolvedValueOnce({
+      title: 'Big News Story',
+      content: '<p>Body</p>',
+      textContent: 'Body',
+      excerpt: 'A short summary',
+      byline: 'Jane Doe',
+      image: 'https://example.com/hero.jpg',
+      url: 'https://example.com/article',
+    });
+
+    const metadata = await generateMetadata({ params: { id: 'abc123' } });
+
+    expect(metadata.title).toBe('Big News Story');
+    expect(metadata.description).toBe('A short summary');
+    expect(metadata.openGraph?.title).toBe('Big News Story');
+    expect(metadata.openGraph?.images).toEqual([{ url: 'https://example.com/hero.jpg' }]);
+    expect(metadata.twitter?.card).toBe('summary_large_image');
+  });
+
+  it('falls back to a generic title when the article is missing', async () => {
+    const { kv } = await import('@vercel/kv');
+    const { generateMetadata } = await import('@/app/reader/[id]/page');
+
+    vi.mocked(kv.get).mockResolvedValueOnce(null);
+
+    const metadata = await generateMetadata({ params: { id: 'missing' } });
+    expect(metadata.title).toBe('Article not found - Read It All');
+  });
+});

@@ -1,67 +1,54 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
-import { Reader } from '@/components/Reader';
+import type { Metadata } from 'next';
 import Link from 'next/link';
+import { Reader } from '@/components/Reader';
+import { getArticleById, getArticleViews } from '@/lib/redis';
 
-interface ArticleData {
-  id: string;
-  title: string;
-  content: string;
-  textContent: string;
-  excerpt: string;
-  byline: string | null;
-  image: string | null;
-  url: string;
-  cached: boolean;
-  views?: number;
-}
+export const dynamic = 'force-dynamic';
 
-export default function ReaderPage() {
-  const params = useParams();
-  const id = params.id as string;
-  const [article, setArticle] = useState<ArticleData | null>(null);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchArticle() {
-      try {
-        const res = await fetch(`/api/article/${id}`);
-        if (!res.ok) {
-          const data = await res.json();
-          setError(data.error || 'Article not found');
-          return;
-        }
-        const data = await res.json();
-        setArticle(data);
-      } catch {
-        setError('Failed to load article');
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchArticle();
-  }, [id]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full" />
-      </div>
-    );
+export async function generateMetadata({
+  params,
+}: {
+  params: { id: string };
+}): Promise<Metadata> {
+  const article = await getArticleById(params.id);
+  if (!article) {
+    return { title: 'Article not found - Read It All' };
   }
 
-  if (error) {
+  const description = article.excerpt || article.textContent?.slice(0, 200);
+
+  return {
+    title: article.title,
+    description,
+    openGraph: {
+      title: article.title,
+      description,
+      type: 'article',
+      images: article.image ? [{ url: article.image }] : undefined,
+      ...(article.byline ? { authors: [article.byline] } : {}),
+    },
+    twitter: {
+      card: article.image ? 'summary_large_image' : 'summary',
+      title: article.title,
+      description,
+      images: article.image ? [article.image] : undefined,
+    },
+  };
+}
+
+export default async function ReaderPage({
+  params,
+}: {
+  params: { id: string };
+}) {
+  const article = await getArticleById(params.id);
+
+  if (!article) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="text-center">
-          <p className="text-red-500 dark:text-red-400 mb-4">{error}</p>
-          <Link
-            href="/"
-            className="text-blue-600 dark:text-blue-400 hover:underline"
-          >
+          <p className="text-red-500 dark:text-red-400 mb-4">Article not found or expired</p>
+          <Link href="/" className="text-blue-600 dark:text-blue-400 hover:underline">
             Back to home
           </Link>
         </div>
@@ -69,12 +56,7 @@ export default function ReaderPage() {
     );
   }
 
-  if (!article) return null;
+  const views = await getArticleViews(params.id);
 
-  return (
-    <Reader
-      article={article}
-      onBack={() => (window.location.href = '/')}
-    />
-  );
+  return <Reader article={{ id: params.id, ...article, cached: true, views }} />;
 }

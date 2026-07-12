@@ -77,7 +77,7 @@ function AcceptInner() {
     );
   }
 
-  return <Reader article={article} onBack={() => (window.location.href = '/')} />;
+  return <Reader article={article} />;
 }
 
 export default function AcceptPage() {

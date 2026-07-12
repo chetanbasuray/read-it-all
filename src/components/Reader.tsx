@@ -15,12 +15,11 @@ interface ReaderProps {
     cached?: boolean;
     views?: number;
   };
-  onBack: () => void;
 }
 
 const FONT_SIZES = ['text-sm', 'text-base', 'text-lg', 'text-xl'] as const;
 
-export function Reader({ article, onBack }: ReaderProps) {
+export function Reader({ article }: ReaderProps) {
   const { theme, toggleTheme } = useTheme();
   const [fontSizeIndex, setFontSizeIndex] = useState(2);
   const [copied, setCopied] = useState(false);
@@ -58,7 +57,7 @@ export function Reader({ article, onBack }: ReaderProps) {
       <header className="sticky top-0 z-10 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800">
         <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           <button
-            onClick={onBack}
+            onClick={() => (window.location.href = '/')}
             className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors whitespace-nowrap"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

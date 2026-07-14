@@ -69,6 +69,29 @@ async function getLocalHtml(url: string, cookies?: string): Promise<string> {
     },
   });
 
+  // patches the most common headless-automation tells (navigator.webdriver, missing
+  // window.chrome, empty plugins/permissions) that bot-detection services like
+  // DataDome check for; no guarantee against fingerprinting below the JS layer
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+
+    (window as unknown as { chrome: unknown }).chrome = { runtime: {} };
+
+    Object.defineProperty(navigator, 'plugins', {
+      get: () => [1, 2, 3, 4, 5],
+    });
+
+    Object.defineProperty(navigator, 'languages', {
+      get: () => ['en-US', 'en'],
+    });
+
+    const originalQuery = window.navigator.permissions.query.bind(window.navigator.permissions);
+    window.navigator.permissions.query = (parameters: PermissionDescriptor) =>
+      parameters.name === 'notifications'
+        ? Promise.resolve({ state: Notification.permission } as PermissionStatus)
+        : originalQuery(parameters);
+  });
+
   // a redirect or client-side navigation inside the page could otherwise steer
   // this browser at an internal address that was never checked by validateUrl
   await context.route('**/*', async (route: any) => {

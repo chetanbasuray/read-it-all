@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  parseWithReadability,
-  extractFromJsonLd,
-  extractFirstImage,
-  extractTitle,
-  extractAuthor,
-} from '@/lib/scraper';
+import { extractArticle } from '@/lib/scraper';
+import { polishArticleForSite } from '@/lib/site-rules';
 import { setCachedArticle, getCachedArticle, getArticleViews } from '@/lib/redis';
 import { hashUrl, cleanTrackingParams } from '@/lib/utils';
 import { sanitizeHtml } from '@/lib/sanitize';
@@ -78,7 +73,7 @@ export async function POST(request: NextRequest) {
     const canonicalUrl = cleanTrackingParams(normalizedUrl);
 
     if (content && content.length > 200) {
-      article = {
+      article = polishArticleForSite({
         title: title || 'Untitled',
         content,
         textContent: textContent || '',
@@ -86,25 +81,9 @@ export async function POST(request: NextRequest) {
         byline: byline || null,
         image: image || null,
         url: canonicalUrl,
-      };
+      });
     } else if (html && html.length >= 500) {
-      article =
-        parseWithReadability(html, canonicalUrl) ||
-        (() => {
-          const jsonld = extractFromJsonLd(html);
-          if (jsonld && jsonld.content && jsonld.content.length > 200) {
-            return {
-              title: jsonld.title || 'Untitled',
-              content: jsonld.content,
-              textContent: jsonld.textContent || '',
-              excerpt: jsonld.textContent?.substring(0, 200) || '',
-              byline: jsonld.byline || extractAuthor(html) || null,
-              image: jsonld.image || extractFirstImage(html, canonicalUrl),
-              url: canonicalUrl,
-            };
-          }
-          return null;
-        })();
+      article = extractArticle(html, canonicalUrl);
     }
 
     if (!article) {

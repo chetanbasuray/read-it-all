@@ -3,6 +3,7 @@ import { Readability } from '@mozilla/readability';
 import * as cheerio from 'cheerio';
 import { sanitizeHtml } from './sanitize';
 import { safeFetch } from './urlSafety';
+import { preprocessHtmlForSite, polishArticleForSite } from './site-rules';
 
 async function dynamicRenderPage(url: string, cookies?: string): Promise<string> {
   const { renderPage } = await import('./browser');
@@ -327,6 +328,35 @@ function $tryExtractContentFromNoscript(html: string): string | null {
   return null;
 }
 
+// shared by every fallback tier (direct fetch, AMP, browser render, Google Cache, Wayback)
+// so a per-domain rule only needs to be wired in once.
+// fetchUrl is what was actually requested/parsed (matters for relative image resolution
+// on an AMP page); canonicalUrl is what gets stored as article.url for display/caching.
+export function extractArticle(html: string, fetchUrl: string, canonicalUrl: string = fetchUrl): ArticleData | null {
+  const preprocessed = preprocessHtmlForSite(fetchUrl, html);
+
+  const jsonld = extractFromJsonLd(preprocessed);
+  if (jsonld && jsonld.content && jsonld.content.length > 200) {
+    return polishArticleForSite({
+      title: jsonld.title || 'Untitled',
+      content: jsonld.content,
+      textContent: jsonld.textContent || '',
+      excerpt: jsonld.textContent?.substring(0, 200) || '',
+      byline: jsonld.byline || extractAuthor(preprocessed) || null,
+      image: jsonld.image || extractFirstImage(preprocessed, fetchUrl),
+      url: canonicalUrl,
+    });
+  }
+
+  const fromMeta = buildArticleFromMetadata(preprocessed, fetchUrl);
+  if (fromMeta) return polishArticleForSite({ ...fromMeta, url: canonicalUrl });
+
+  const article = parseWithReadability(preprocessed, fetchUrl);
+  if (article) return polishArticleForSite({ ...article, url: canonicalUrl });
+
+  return null;
+}
+
 function extractAmpUrl(originalUrl: string): string | null {
   try {
     const u = new URL(originalUrl);
@@ -399,23 +429,7 @@ export async function scrapeArticle(
         continue;
       }
 
-      const jsonld = extractFromJsonLd(html);
-      if (jsonld && jsonld.content && jsonld.content.length > 200) {
-        return {
-          title: jsonld.title || 'Untitled',
-          content: jsonld.content,
-          textContent: jsonld.textContent || '',
-          excerpt: jsonld.textContent?.substring(0, 200) || '',
-          byline: jsonld.byline || extractAuthor(html) || null,
-          image: jsonld.image || extractFirstImage(html, url),
-          url,
-        };
-      }
-
-      const fromMeta = buildArticleFromMetadata(html, url);
-      if (fromMeta) return fromMeta;
-
-      const article = parseWithReadability(html, url);
+      const article = extractArticle(html, url);
       if (article) return article;
     }
   }
@@ -433,20 +447,8 @@ export async function scrapeArticle(
           Referer: 'https://www.google.com/',
         }, cookies);
         if (html && !blocked && html.length > 500) {
-          const article = parseWithReadability(html, ampUrl);
+          const article = extractArticle(html, ampUrl, url);
           if (article) return article;
-          const jsonld = extractFromJsonLd(html);
-          if (jsonld && jsonld.content && jsonld.content.length > 200) {
-            return {
-              title: jsonld.title || 'Untitled',
-              content: jsonld.content,
-              textContent: jsonld.textContent || '',
-              excerpt: jsonld.textContent?.substring(0, 200) || '',
-              byline: jsonld.byline || null,
-              image: jsonld.image || extractFirstImage(html, url),
-              url,
-            };
-          }
         }
       }
       errors.push('AMP URL also blocked');
@@ -459,21 +461,8 @@ export async function scrapeArticle(
     errors.push('Attempting browser rendering (Playwright/Browserless)...');
     const browserHtml = await dynamicRenderPage(url, cookies);
     if (browserHtml && browserHtml.length > 500) {
-      const article = parseWithReadability(browserHtml, url);
+      const article = extractArticle(browserHtml, url);
       if (article) return article;
-
-      const jsonld = extractFromJsonLd(browserHtml);
-      if (jsonld && jsonld.content && jsonld.content.length > 200) {
-        return {
-          title: jsonld.title || 'Untitled',
-          content: jsonld.content,
-          textContent: jsonld.textContent || '',
-          excerpt: jsonld.textContent?.substring(0, 200) || '',
-          byline: jsonld.byline || extractAuthor(browserHtml) || null,
-          image: jsonld.image || extractFirstImage(browserHtml, url),
-          url,
-        };
-      }
     }
     errors.push('Browser rendering did not yield article content');
   } catch (e) {
@@ -486,42 +475,16 @@ export async function scrapeArticle(
 
   const googleHtml = await fetchFromGoogleCache(url);
   if (googleHtml) {
-    const article = parseWithReadability(googleHtml, url);
+    const article = extractArticle(googleHtml, url);
     if (article) return article;
-
-    const jsonld = extractFromJsonLd(googleHtml);
-    if (jsonld && jsonld.content && jsonld.content.length > 200) {
-      return {
-        title: jsonld.title || 'Untitled',
-        content: jsonld.content,
-        textContent: jsonld.textContent || '',
-        excerpt: jsonld.textContent?.substring(0, 200) || '',
-        byline: jsonld.byline || null,
-        image: jsonld.image || extractFirstImage(googleHtml, url),
-        url,
-      };
-    }
   } else {
     errors.push('Google Cache: no snapshot available');
   }
 
   const waybackHtml = await fetchFromWayback(url);
   if (waybackHtml) {
-    const article = parseWithReadability(waybackHtml, url);
+    const article = extractArticle(waybackHtml, url);
     if (article) return article;
-
-    const jsonld = extractFromJsonLd(waybackHtml);
-    if (jsonld && jsonld.content && jsonld.content.length > 200) {
-      return {
-        title: jsonld.title || 'Untitled',
-        content: jsonld.content,
-        textContent: jsonld.textContent || '',
-        excerpt: jsonld.textContent?.substring(0, 200) || '',
-        byline: jsonld.byline || null,
-        image: jsonld.image || extractFirstImage(waybackHtml, url),
-        url,
-      };
-    }
   } else {
     errors.push('Wayback Machine: no snapshot available or rate-limited');
   }

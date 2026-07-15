@@ -55,6 +55,33 @@ describe('preprocessHtmlForSite', () => {
   it('does not throw on an invalid url', () => {
     expect(() => preprocessHtmlForSite('not a url', '<p>x</p>')).not.toThrow();
   });
+
+  it('strips the video widget, related-links, tag list, and byline action buttons for bbc.com', () => {
+    const html =
+      '<html><body>' +
+      '<div class="Byline-styles__BylineStyled-sc-1">17 minutes ago' +
+      '<div class="Byline-styles__ActionsContainerStyled-sc-2">' +
+      '<span>Share</span><span>Save</span></div>' +
+      '<div class="Byline-styles__GooglePreferredButtonContainerStyled-sc-3">Add as preferred on Google</div>' +
+      '<span class="Byline-styles__AuthorNameStyled-sc-4">Helen Sullivan, BBC News</span></div>' +
+      '<figure><div class="PortraitVideoConstraint-sc-5"><div class="CustomCTA-styles__DurationStyled-sc-6">1:26</div>' +
+      '<figcaption>Watch: some video caption</figcaption></div></figure>' +
+      '<p>Real paragraph.</p>' +
+      '<div class="Links-styles__LinksContainerStyled-sc-7"><h2>More on this story</h2></div>' +
+      '<div class="TagList-styles__TagListStyled-sc-8"><a href="/topics/x">Some Topic</a></div>' +
+      '</body></html>';
+
+    const result = preprocessHtmlForSite('https://www.bbc.com/news/articles/c456', html);
+
+    expect(result).not.toContain('Share');
+    expect(result).not.toContain('Add as preferred on Google');
+    expect(result).not.toContain('Watch: some video caption');
+    expect(result).not.toContain('More on this story');
+    expect(result).not.toContain('Some Topic');
+    expect(result).toContain('17 minutes ago');
+    expect(result).toContain('Helen Sullivan, BBC News');
+    expect(result).toContain('Real paragraph.');
+  });
 });
 
 describe('extractArticle with BBC nav-menu regression', () => {

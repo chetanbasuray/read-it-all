@@ -250,3 +250,65 @@ describe('preprocessHtmlForSite for cnn.com', () => {
     expect(preprocessHtmlForSite('https://edition.cnn.com/2026/07/14/example', html)).not.toContain('headerSubNav');
   });
 });
+
+describe('preprocessHtmlForSite for timesofindia.indiatimes.com', () => {
+  const url = 'https://timesofindia.indiatimes.com/india/example/articleshow/1.cms';
+
+  it('turns paragraph-break spans into real breaks and drops the JSON-LD script', () => {
+    const html =
+      '<html><body><script type="application/ld+json">{"articleBody":"no paragraph markers at all"}</script>' +
+      '<div>First sentence.<span class="id-r-component br" data-pos="2"></span>Second sentence.</div>' +
+      '</body></html>';
+
+    const result = preprocessHtmlForSite(url, html);
+
+    expect(result).not.toContain('id-r-component');
+    expect(result).not.toContain('application/ld+json');
+    expect(result).toContain('First sentence.<br><br>Second sentence.');
+  });
+
+  it('strips the sng.link app-download promo, Taboola/mgid widgets, and poll wrapper', () => {
+    const html =
+      '<html><body>' +
+      '<p>Real paragraph.</p>' +
+      '<div class="cdatainfo"><a href="https://timesofindia.sng.link/x">Get the latest India news and live updates. Download the TOI App.</a></div>' +
+      '<div class="cdatainfo"><h3>A real subheading</h3></div>' +
+      '<div id="taboola-mid-article-thumbnails-1" class="wdt-taboola">junk</div>' +
+      '<div class="mgid_second_mrec_parent">junk</div>' +
+      '<div class="sQLTU timeline_pollWrapper_as">Poll junk</div>' +
+      '</body></html>';
+
+    const result = preprocessHtmlForSite(url, html);
+
+    expect(result).not.toContain('Download the TOI');
+    expect(result).not.toContain('junk');
+    expect(result).toContain('Real paragraph.');
+    expect(result).toContain('A real subheading');
+  });
+
+  it('leaves content untouched when none of the known junk is present', () => {
+    const html = '<html><body><p>Clean paragraph.</p></body></html>';
+    expect(preprocessHtmlForSite(url, html)).toContain('Clean paragraph.');
+  });
+});
+
+describe('polishArticleForSite for timesofindia.indiatimes.com', () => {
+  const url = 'https://timesofindia.indiatimes.com/india/example/articleshow/1.cms';
+
+  it('strips the publication and timestamp bundled into the byline', () => {
+    const article = polishArticleForSite(
+      fakeArticle({ url, byline: 'TOI News Desk / TIMESOFINDIA.COM /  Jul 15, 2026, 12:46 IST' }),
+    );
+    expect(article.byline).toBe('TOI News Desk');
+  });
+
+  it('leaves a byline with no publication/timestamp suffix untouched', () => {
+    const article = polishArticleForSite(fakeArticle({ url, byline: 'TOI News Desk' }));
+    expect(article.byline).toBe('TOI News Desk');
+  });
+
+  it('leaves a null byline untouched', () => {
+    const article = polishArticleForSite(fakeArticle({ url, byline: null }));
+    expect(article.byline).toBeNull();
+  });
+});

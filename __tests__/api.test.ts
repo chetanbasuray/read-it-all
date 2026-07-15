@@ -227,6 +227,16 @@ describe('sanitizeHtml', () => {
     expect(result).toContain('Getty Images');
     expect(result).toContain('A real caption.');
   });
+
+  it('strips OneTrust cookie-consent widgets regardless of site', () => {
+    const result = sanitizeHtml(
+      '<p>Real paragraph.</p>' +
+        '<div id="onetrust-consent-sdk"><div id="onetrust-banner-sdk">' +
+        '<h2 id="onetrust-policy-title">Our use of cookies</h2></div></div>',
+    );
+    expect(result).not.toContain('Our use of cookies');
+    expect(result).toContain('Real paragraph.');
+  });
 });
 
 describe('validateUrl', () => {

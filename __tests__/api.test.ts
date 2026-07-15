@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ScrapeError, extractFirstImage, extractAuthor, extractArticle, isPaywallBoilerplate } from '@/lib/scraper';
+import { ScrapeError, TakedownError, extractFirstImage, extractAuthor, extractArticle, isPaywallBoilerplate } from '@/lib/scraper';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { validateUrl, safeFetch } from '@/lib/urlSafety';
 
@@ -33,10 +33,19 @@ vi.mock('@/lib/scraper', async () => {
   };
 });
 
+vi.mock('@/lib/takedowns', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/takedowns')>('@/lib/takedowns');
+  return {
+    ...actual,
+    getTakedown: vi.fn(actual.getTakedown),
+  };
+});
+
 const { POST } = await import('@/app/api/bypass/route');
 const { POST: rescrapePOST } = await import('@/app/api/rescrape/route');
 const { POST: ingestPOST } = await import('@/app/api/ingest/route');
 const { scrapeArticle } = await import('@/lib/scraper');
+const { getTakedown } = await import('@/lib/takedowns');
 
 function createRequest(body: unknown, url = 'http://localhost:3000/api/bypass', headers: Record<string, string> = {}): Request {
   return new Request(url, {
@@ -392,6 +401,45 @@ describe('POST /api/rescrape', () => {
     expect(data.evicted).toBe(true);
     expect(scrapeArticle).not.toHaveBeenCalled();
     expect(kv.del).toHaveBeenCalledWith(expect.stringMatching(/^article:/));
+  });
+});
+
+describe('takedowns integration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.mocked(getTakedown).mockReset();
+  });
+
+  it('POST /api/bypass returns 451 when scrapeArticle reports a takedown', async () => {
+    const { kv } = await import('@vercel/kv');
+    vi.mocked(kv.get).mockResolvedValue(null);
+    const entry = { requestId: 'gh-1', link: 'https://github.com/x/y/issues/1', date: '2026-07-15' };
+    vi.mocked(scrapeArticle).mockRejectedValue(new TakedownError(entry));
+
+    const response = await POST(createRequest({ url: 'https://example.com/taken-down-article' }));
+    const data = await response.json();
+
+    expect(response.status).toBe(451);
+    expect(data.error).toContain('gh-1');
+  });
+
+  it('POST /api/ingest returns 451 without extracting when the URL is on the takedown list', async () => {
+    const entry = { requestId: 'gh-2', link: 'https://github.com/x/y/issues/2', date: '2026-07-15' };
+    vi.mocked(getTakedown).mockReturnValue(entry);
+
+    const response = await ingestPOST(
+      createRequest(
+        { url: 'https://example.com/taken-down-article', content: `<p>${'x'.repeat(250)}</p>` },
+        'http://localhost:3000/api/ingest',
+      ),
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(451);
+    expect(data.error).toContain('gh-2');
   });
 });
 

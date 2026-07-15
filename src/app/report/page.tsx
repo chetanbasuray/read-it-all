@@ -43,11 +43,15 @@ export default function ReportPage() {
             and include:
           </p>
           <ul>
-            <li>The original article URL</li>
+            <li>The original article URL, or the whole domain if you want everything from your site excluded</li>
             <li>The Read It All link (the <code>/reader/...</code> URL), if you have it</li>
             <li>A brief statement that you are the publisher or rights holder, or represent them</li>
           </ul>
-          <p>Requests are handled promptly, and the corresponding cached content will be deleted.</p>
+          <p>
+            Requests are handled promptly. The corresponding cached content is deleted, and that URL (or
+            domain, if requested) is added to a permanent removal list so it is not scraped again. The
+            GitHub issue itself serves as the record of the request.
+          </p>
 
           <h2>Search engines</h2>
           <p>

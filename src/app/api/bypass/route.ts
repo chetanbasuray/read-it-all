@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { scrapeArticle, ScrapeError } from '@/lib/scraper';
+import { scrapeArticle, ScrapeError, TakedownError } from '@/lib/scraper';
 import { getCachedArticle, setCachedArticle } from '@/lib/redis';
 import { hashUrl, cleanTrackingParams } from '@/lib/utils';
 import { normalizeAndValidateUrl } from '@/lib/urlSafety';
@@ -67,6 +67,10 @@ export async function POST(request: NextRequest) {
       cached: false,
     });
   } catch (error) {
+    if (error instanceof TakedownError) {
+      // 451 Unavailable For Legal Reasons: content withheld due to a rights-holder request
+      return NextResponse.json({ error: error.message }, { status: 451 });
+    }
     if (error instanceof ScrapeError) {
       // fallback-chain internals (per-UA HTTP codes, render errors) are for our own debugging, not the end user
       console.error('scrape failed', { message: error.message, details: error.details });

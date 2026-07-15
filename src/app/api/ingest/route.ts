@@ -5,6 +5,7 @@ import { setCachedArticle, getCachedArticle, getArticleViews } from '@/lib/redis
 import { hashUrl, cleanTrackingParams } from '@/lib/utils';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
+import { getTakedown } from '@/lib/takedowns';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -87,6 +88,18 @@ export async function POST(request: NextRequest) {
     } | null = null;
 
     const canonicalUrl = cleanTrackingParams(normalizedUrl);
+
+    // ingest never calls scrapeArticle (it uses content the caller already
+    // extracted), so it needs its own check rather than relying on scraper.ts's
+    const takedown = getTakedown(canonicalUrl);
+    if (takedown) {
+      return NextResponse.json(
+        {
+          error: `This content is not available. The publisher requested it be removed (request ${takedown.requestId}). See ${takedown.link} for details.`,
+        },
+        { status: 451, headers: corsHeaders },
+      );
+    }
 
     if (content && content.length > 200) {
       article = polishArticleForSite({

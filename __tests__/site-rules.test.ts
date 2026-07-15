@@ -312,3 +312,110 @@ describe('polishArticleForSite for timesofindia.indiatimes.com', () => {
     expect(article.byline).toBeNull();
   });
 });
+
+describe('preprocessHtmlForSite for timesofisrael.com', () => {
+  const url = 'https://www.timesofisrael.com/example-article/';
+
+  it('strips the sibling date/edit spans from the byline wrapper, keeping the byline text', () => {
+    const html =
+      '<html><body><div class="wrap-byline">' +
+      '<span class="byline">By <a href="/writers/toi-staff/">ToI Staff</a></span>' +
+      '<span class="date">Today, 10:04 am</span>' +
+      '<span class="edit empty"><a href="/wp-admin">Edit</a></span>' +
+      '</div><p>Real paragraph.</p></body></html>';
+
+    const result = preprocessHtmlForSite(url, html);
+
+    expect(result).not.toContain('Today, 10:04 am');
+    expect(result).not.toContain('Edit');
+    expect(result).toContain('ToI Staff');
+    expect(result).toContain('Real paragraph.');
+  });
+
+  it('strips the inline newsletter-signup widget', () => {
+    const html =
+      '<html><body>' +
+      '<p>Real paragraph one.</p>' +
+      '<div class="newsletter newsletter-article" data-website="timesofisrael">' +
+      '<div class="newsletter-article-text"><span>Get The Times of Israel&#39;s Daily Edition</span></div>' +
+      '<div class="newsletter-article-terms">By signing up, you agree to the terms</div>' +
+      '</div>' +
+      '<p>Real paragraph two.</p>' +
+      '</body></html>';
+
+    const result = preprocessHtmlForSite(url, html);
+
+    expect(result).not.toContain('Daily Edition');
+    expect(result).not.toContain('agree to the terms');
+    expect(result).toContain('Real paragraph one.');
+    expect(result).toContain('Real paragraph two.');
+  });
+
+  it('leaves content untouched when none of the known junk is present', () => {
+    const html = '<html><body><p>Clean paragraph.</p></body></html>';
+    expect(preprocessHtmlForSite(url, html)).toContain('Clean paragraph.');
+  });
+});
+
+describe('polishArticleForSite for timesofisrael.com', () => {
+  const url = 'https://www.timesofisrael.com/example-article/';
+
+  it('strips the leading "By " prefix, since the reader UI adds its own', () => {
+    const article = polishArticleForSite(fakeArticle({ url, byline: 'By ToI Staff' }));
+    expect(article.byline).toBe('ToI Staff');
+  });
+
+  it('leaves a byline with no "By " prefix untouched', () => {
+    const article = polishArticleForSite(fakeArticle({ url, byline: 'ToI Staff' }));
+    expect(article.byline).toBe('ToI Staff');
+  });
+
+  it('leaves a null byline untouched', () => {
+    const article = polishArticleForSite(fakeArticle({ url, byline: null }));
+    expect(article.byline).toBeNull();
+  });
+});
+
+describe('preprocessHtmlForSite for bylinetimes.com', () => {
+  const url = 'https://bylinetimes.com/2026/07/09/example-article/';
+
+  it('strips a <noscript> lazy-load image fallback long enough to fool the noscript-extraction fallback tier', () => {
+    const longAttrString = 'x'.repeat(600);
+    const html =
+      `<html><body><noscript><img src="/image.jpg" data-srcset="${longAttrString}"></noscript>` +
+      '<article><h1>Real headline</h1><p>' +
+      'This is the real article body with enough substance to be extracted correctly. '.repeat(10) +
+      '</p></article></body></html>';
+
+    const result = extractArticle(html, url);
+
+    expect(result).not.toBeNull();
+    expect(result?.textContent).toContain('real article body');
+  });
+
+  it('strips the magazine-subscription promo block by its heading, keeping real content around it', () => {
+    const html =
+      '<html><body>' +
+      '<div class="wp-block-post-author-name"><a href="/author/x">Real Author</a></div>' +
+      '<div class="wp-block-columns alignfull">' +
+      '<h2 id="h-read-our-monthly-magazine">Read our Monthly Magazine</h2>' +
+      '<h3>And support our mission to provide fearless stories</h3>' +
+      '<a href="https://subscribe.bylinetimes.com/">Support Our Mission</a>' +
+      '</div>' +
+      '<p>Real paragraph one.</p>' +
+      '<p>Real paragraph two.</p>' +
+      '</body></html>';
+
+    const result = preprocessHtmlForSite(url, html);
+
+    expect(result).not.toContain('Monthly Magazine');
+    expect(result).not.toContain('Support Our Mission');
+    expect(result).toContain('Real paragraph one.');
+    expect(result).toContain('Real paragraph two.');
+  });
+
+  it('leaves content untouched when none of the known junk is present', () => {
+    const html = '<html><body><p>Clean paragraph.</p></body></html>';
+    expect(preprocessHtmlForSite(url, html)).toContain('Clean paragraph.');
+  });
+});

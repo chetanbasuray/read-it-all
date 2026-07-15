@@ -84,9 +84,26 @@ export async function setCachedArticle(url: string, article: ArticleData): Promi
 // unlike getCachedArticle, always scrapes even if a cache entry exists, and
 // resets scrapedAt so the sliding staleness window restarts from now
 export async function forceRescrapeArticle(url: string): Promise<ArticleData> {
-  const fresh = await scrapeArticle(url);
-  await setCachedArticle(url, fresh);
-  return fresh;
+  try {
+    const fresh = await scrapeArticle(url);
+    await setCachedArticle(url, fresh);
+    return fresh;
+  } catch (error) {
+    // the whole point of a forced rescrape is "the cached content is known
+    // wrong"; if a fresh scrape can't replace it, keeping the old content
+    // around would silently keep serving that same known-wrong content
+    await evictCachedArticle(url);
+    throw error;
+  }
+}
+
+async function evictCachedArticle(url: string): Promise<void> {
+  if (!isRedisConfigured) return;
+  try {
+    await kv.del(getCacheKey(url));
+  } catch {
+    // best-effort; a failed eviction just means the stale entry lives until its TTL
+  }
 }
 
 export async function getArticleById(id: string): Promise<ArticleData | null> {

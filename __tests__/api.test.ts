@@ -14,6 +14,7 @@ vi.mock('@vercel/kv', () => ({
     get: vi.fn().mockResolvedValue(null),
     set: vi.fn().mockResolvedValue('OK'),
     expire: vi.fn().mockResolvedValue(1),
+    del: vi.fn().mockResolvedValue(1),
   },
 }));
 
@@ -292,6 +293,17 @@ describe('POST /api/rescrape', () => {
       createRequest({ url: 'https://example.com/article' }, RESCRAPE_URL, { Authorization: 'Bearer test-token' }),
     );
     expect(response.status).toBe(502);
+  });
+
+  it('evicts an existing cache entry when the rescrape fails, instead of leaving known-wrong content in place', async () => {
+    const { kv } = await import('@vercel/kv');
+    vi.mocked(scrapeArticle).mockRejectedValue(new Error('Scraping failed'));
+
+    await rescrapePOST(
+      createRequest({ url: 'https://example.com/article' }, RESCRAPE_URL, { Authorization: 'Bearer test-token' }),
+    );
+
+    expect(kv.del).toHaveBeenCalledWith(expect.stringMatching(/^article:/));
   });
 });
 

@@ -199,6 +199,7 @@ describe('POST /api/rescrape', () => {
 
   afterEach(() => {
     delete process.env.RESCRAPE_TOKEN;
+    delete process.env.RESCRAPE_TOKEN_AGENT;
   });
 
   it('returns 401 when no token is configured', async () => {
@@ -217,6 +218,40 @@ describe('POST /api/rescrape', () => {
   it('returns 401 when the token is wrong', async () => {
     const response = await rescrapePOST(
       createRequest({ url: 'https://example.com/article' }, RESCRAPE_URL, { Authorization: 'Bearer wrong-token' }),
+    );
+    expect(response.status).toBe(401);
+  });
+
+  it('accepts the secondary agent token when it is configured', async () => {
+    process.env.RESCRAPE_TOKEN_AGENT = 'agent-token';
+    vi.mocked(scrapeArticle).mockResolvedValue({
+      title: 'T', content: '<p>c</p>', textContent: 'c', excerpt: 'c', byline: null, image: null,
+      url: 'https://example.com/article',
+    });
+
+    const response = await rescrapePOST(
+      createRequest({ url: 'https://example.com/article' }, RESCRAPE_URL, { Authorization: 'Bearer agent-token' }),
+    );
+    expect(response.status).toBe(200);
+  });
+
+  it('still accepts the primary token when a secondary agent token is also configured', async () => {
+    process.env.RESCRAPE_TOKEN_AGENT = 'agent-token';
+    vi.mocked(scrapeArticle).mockResolvedValue({
+      title: 'T', content: '<p>c</p>', textContent: 'c', excerpt: 'c', byline: null, image: null,
+      url: 'https://example.com/article',
+    });
+
+    const response = await rescrapePOST(
+      createRequest({ url: 'https://example.com/article' }, RESCRAPE_URL, { Authorization: 'Bearer test-token' }),
+    );
+    expect(response.status).toBe(200);
+  });
+
+  it('rejects a token that matches neither the primary nor the secondary secret', async () => {
+    process.env.RESCRAPE_TOKEN_AGENT = 'agent-token';
+    const response = await rescrapePOST(
+      createRequest({ url: 'https://example.com/article' }, RESCRAPE_URL, { Authorization: 'Bearer someone-elses-token' }),
     );
     expect(response.status).toBe(401);
   });

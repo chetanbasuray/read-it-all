@@ -53,6 +53,7 @@ const BOT_CHALLENGE_PATTERNS = [
   'cf-browser-verification',
   'cf-challenge',
   'Just a moment',
+  'just a quick check',
   'attention required',
   'Cloudflare',
   'Access denied',
@@ -507,7 +508,7 @@ export async function scrapeArticle(
   try {
     errors.push('Attempting browser rendering (Playwright/Browserless)...');
     const browserHtml = await dynamicRenderPage(url, cookies);
-    if (browserHtml && browserHtml.length > 500) {
+    if (browserHtml && browserHtml.length > 500 && !isBotChallengePage(browserHtml)) {
       const article = extractArticle(browserHtml, url);
       if (article) return article;
     }

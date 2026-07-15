@@ -81,6 +81,14 @@ export async function setCachedArticle(url: string, article: ArticleData): Promi
   }
 }
 
+// unlike getCachedArticle, always scrapes even if a cache entry exists, and
+// resets scrapedAt so the sliding staleness window restarts from now
+export async function forceRescrapeArticle(url: string): Promise<ArticleData> {
+  const fresh = await scrapeArticle(url);
+  await setCachedArticle(url, fresh);
+  return fresh;
+}
+
 export async function getArticleById(id: string): Promise<ArticleData | null> {
   if (!isRedisConfigured) return null;
   try {

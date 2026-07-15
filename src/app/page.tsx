@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { UrlInput } from '@/components/UrlInput';
+import { BookIcon } from '@/components/BookIcon';
 
 interface ApiError {
   error: string;
@@ -46,9 +47,12 @@ export default function HomePage() {
       <main className="flex-1 flex items-center justify-center px-4">
         <div className="w-full max-w-3xl mx-auto text-center">
           <div className="mb-12">
-            <h1 className="text-5xl sm:text-6xl font-bold text-gray-900 dark:text-gray-100 mb-4 tracking-tight">
-              Read It All
-            </h1>
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <BookIcon className="w-10 h-10 sm:w-12 sm:h-12" />
+              <h1 className="text-5xl sm:text-6xl font-bold text-gray-900 dark:text-gray-100 tracking-tight">
+                Read It All
+              </h1>
+            </div>
             <p className="text-lg sm:text-xl text-gray-500 dark:text-gray-400 max-w-lg mx-auto">
               Paste a paywalled article URL and get a clean, distraction-free reading experience.
             </p>

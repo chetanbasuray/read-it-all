@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    .page { fill: #2563eb; }
+    .spine { stroke: #1d4ed8; }
+    @media (prefers-color-scheme: dark) {
+      .page { fill: #60a5fa; }
+      .spine { stroke: #93c5fd; }
+    }
+  </style>
+  <path class="page" d="M16 9 Q10 5 4 7 L4 24 Q10 22 16 26 Z" />
+  <path class="page" d="M16 9 Q22 5 28 7 L28 24 Q22 22 16 26 Z" />
+  <line class="spine" x1="16" y1="9" x2="16" y2="26" stroke-width="1.5" stroke-linecap="round" />
+</svg>

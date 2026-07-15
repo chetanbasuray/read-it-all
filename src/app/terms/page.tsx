@@ -58,6 +58,12 @@ export default function TermsPage() {
             third-party websites it fetches from.
           </p>
 
+          <h2>Content removal</h2>
+          <p>
+            If you are a publisher or rights holder and want content removed from Read It All&apos;s cache,
+            see the <Link href="/report">Report Content</Link> page.
+          </p>
+
           <h2>Changes</h2>
           <p>These terms may change as the service evolves.</p>
 

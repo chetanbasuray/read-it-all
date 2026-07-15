@@ -375,6 +375,24 @@ describe('POST /api/rescrape', () => {
 
     expect(kv.del).toHaveBeenCalledWith(expect.stringMatching(/^article:/));
   });
+
+  it('evicts the cache entry without scraping when evictOnly is set, for takedown requests', async () => {
+    const { kv } = await import('@vercel/kv');
+
+    const response = await rescrapePOST(
+      createRequest(
+        { url: 'https://example.com/article', evictOnly: true },
+        RESCRAPE_URL,
+        { Authorization: 'Bearer test-token' },
+      ),
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.evicted).toBe(true);
+    expect(scrapeArticle).not.toHaveBeenCalled();
+    expect(kv.del).toHaveBeenCalledWith(expect.stringMatching(/^article:/));
+  });
 });
 
 describe('sanitizeHtml', () => {

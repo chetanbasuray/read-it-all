@@ -99,3 +99,49 @@ describe('polishArticleForSite', () => {
     expect(polishArticleForSite(article)).toEqual(article);
   });
 });
+
+describe('polishArticleForSite for reuters.com', () => {
+  const zeroWidthSpace = String.fromCharCode(0x200b);
+
+  it('strips the embedded Read Next widget and ad-slot placeholder', () => {
+    const html =
+      '<p>Real paragraph one.</p>' +
+      '<div class="ad-slot-module__container__VEdre">' +
+      '<span>Advertisement &middot; Scroll to continue</span></div>' +
+      '<p>Real paragraph two.</p>' +
+      '<div class="article-module__read-next__xukaw">' +
+      '<h2>Read Next</h2><ul><li>Unrelated headline one</li><li>Unrelated headline two</li></ul>' +
+      '</div>';
+
+    const article = polishArticleForSite(
+      fakeArticle({ url: 'https://www.reuters.com/world/example-2026-07-14/', content: html }),
+    );
+
+    expect(article.content).not.toContain('Read Next');
+    expect(article.content).not.toContain('Advertisement');
+    expect(article.content).toContain('Real paragraph one.');
+    expect(article.content).toContain('Real paragraph two.');
+  });
+
+  it('strips invisible zero-width characters from text fields', () => {
+    const dirty = `respon${zeroWidthSpace}ded in self${zeroWidthSpace}-defence`;
+    const article = polishArticleForSite(
+      fakeArticle({
+        url: 'https://www.reuters.com/world/example-2026-07-14/',
+        textContent: dirty,
+        excerpt: dirty,
+      }),
+    );
+
+    expect(article.textContent).toBe('responded in self-defence');
+    expect(article.excerpt).toBe('responded in self-defence');
+  });
+
+  it('leaves reuters.com content untouched when it has none of the known junk', () => {
+    const article = fakeArticle({
+      url: 'https://www.reuters.com/world/example-2026-07-14/',
+      content: '<p>Clean paragraph.</p>',
+    });
+    expect(polishArticleForSite(article)).toEqual(article);
+  });
+});

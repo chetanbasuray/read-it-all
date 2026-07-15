@@ -4,6 +4,7 @@ import { bbcRule } from './bbc.com';
 import { reutersRule } from './reuters.com';
 import { guardianRule } from './theguardian.com';
 import { cnnRule } from './cnn.com';
+import { toiRule } from './indiatimes.com';
 
 const SITE_RULES: Record<string, SiteRule> = {
   'bbc.com': bbcRule,
@@ -12,6 +13,7 @@ const SITE_RULES: Record<string, SiteRule> = {
   'theguardian.com': guardianRule,
   'cnn.com': cnnRule,
   'edition.cnn.com': cnnRule,
+  'timesofindia.indiatimes.com': toiRule,
 };
 
 function getSiteRule(url: string): SiteRule | null {

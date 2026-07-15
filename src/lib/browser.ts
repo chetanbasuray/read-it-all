@@ -31,32 +31,45 @@ function parseCookies(cookieString: string, domain: string): { name: string; val
   });
 }
 
-let _chromium: any = null;
-async function getChromium() {
-  if (!_chromium) {
+let _localChromium: any = null;
+
+// Vercel's serverless runtime never has a real browser installed, so channel:'chrome'
+// (real Chrome, used below for local dev) can never launch there. @sparticuz/chromium
+// ships a Chromium binary sized to fit a serverless function; only imported when
+// actually on Vercel, so local dev keeps using full playwright + real Chrome.
+async function launchBrowser(): Promise<Browser> {
+  if (process.env.VERCEL) {
+    const { chromium } = await import('playwright-core');
+    const chromiumBinary = (await import('@sparticuz/chromium')).default;
+    return chromium.launch({
+      args: [...chromiumBinary.args, '--disable-blink-features=AutomationControlled'],
+      executablePath: await chromiumBinary.executablePath(),
+      headless: true,
+    });
+  }
+
+  if (!_localChromium) {
     // Function()-wrapped import hides this from webpack's static bundler, which
     // otherwise packages playwright's native binary loader in a way that breaks at runtime.
     const pw = await Function(
       'return import("playwright")',
     )() as { chromium: any };
-    _chromium = pw.chromium;
+    _localChromium = pw.chromium;
   }
-  return _chromium;
+  return _localChromium.launch({
+    headless: true,
+    channel: 'chrome',
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-blink-features=AutomationControlled',
+    ],
+  });
 }
 
 async function getLocalHtml(url: string, cookies?: string): Promise<string> {
-  const chromium = await getChromium();
-
   if (!browserInstance || !browserInstance.isConnected()) {
-    browserInstance = await chromium.launch({
-      headless: true,
-      channel: 'chrome',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-blink-features=AutomationControlled',
-      ],
-    });
+    browserInstance = await launchBrowser();
   }
   resetIdleTimer();
 

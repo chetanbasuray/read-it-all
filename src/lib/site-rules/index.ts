@@ -3,12 +3,15 @@ import type { SiteRule } from './types';
 import { bbcRule } from './bbc.com';
 import { reutersRule } from './reuters.com';
 import { guardianRule } from './theguardian.com';
+import { cnnRule } from './cnn.com';
 
 const SITE_RULES: Record<string, SiteRule> = {
   'bbc.com': bbcRule,
   'bbc.co.uk': bbcRule,
   'reuters.com': reutersRule,
   'theguardian.com': guardianRule,
+  'cnn.com': cnnRule,
+  'edition.cnn.com': cnnRule,
 };
 
 function getSiteRule(url: string): SiteRule | null {

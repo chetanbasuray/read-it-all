@@ -17,10 +17,23 @@ const ALLOWED_ATTR = [
 // sighted readers via CSS we never apply, so left in they show up as literal text
 const SR_ONLY_CLASS_PATTERN = /(^|\s)(visually-hidden|sr-only|screen-reader-text|a11y-hidden)(\s|$)/i;
 
+// OneTrust is one of the most widely deployed cookie-consent platforms on the
+// web; its markup is a fixed-id widget (onetrust-consent-sdk and friends),
+// never article content, regardless of which site embeds it
+const ONETRUST_ID_PATTERN = /^onetrust/i;
+
 DOMPurify.addHook('uponSanitizeElement', (node) => {
   if (node.nodeType !== 1) return;
-  const className = (node as Element).getAttribute('class');
+  const el = node as Element;
+
+  const className = el.getAttribute('class');
   if (className && SR_ONLY_CLASS_PATTERN.test(className)) {
+    node.parentNode?.removeChild(node);
+    return;
+  }
+
+  const id = el.getAttribute('id');
+  if (id && ONETRUST_ID_PATTERN.test(id)) {
     node.parentNode?.removeChild(node);
   }
 });

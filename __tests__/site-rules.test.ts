@@ -221,3 +221,32 @@ describe('polishArticleForSite for theguardian.com', () => {
     expect(polishArticleForSite(article)).toEqual(article);
   });
 });
+
+describe('preprocessHtmlForSite for cnn.com', () => {
+  it('strips the header nav, ad-feedback modal, and app-download promo', () => {
+    const html =
+      '<html><body>' +
+      '<div id="ad-feedback__modal-overlay">Your effort and contribution is appreciated.</div>' +
+      '<div id="headerSubNav"><a href="/live-tv">Live TV</a><a href="/watch">Watch</a></div>' +
+      '<p>Real paragraph one.</p>' +
+      '<div><div><h2>Download the CNN app</h2></div>' +
+      '<div><p>Scan the QR code to download the CNN app.</p></div></div>' +
+      '<p>Real paragraph two.</p>' +
+      '</body></html>';
+
+    const result = preprocessHtmlForSite('https://edition.cnn.com/2026/07/14/example', html);
+
+    expect(result).not.toContain('Your effort and contribution');
+    expect(result).not.toContain('Live TV');
+    expect(result).not.toContain('Download the CNN app');
+    expect(result).not.toContain('Scan the QR code');
+    expect(result).toContain('Real paragraph one.');
+    expect(result).toContain('Real paragraph two.');
+  });
+
+  it('applies the same rule to edition.cnn.com and cnn.com', () => {
+    const html = '<html><body><div id="headerSubNav">nav</div><p>Real.</p></body></html>';
+    expect(preprocessHtmlForSite('https://www.cnn.com/2026/07/14/example', html)).not.toContain('headerSubNav');
+    expect(preprocessHtmlForSite('https://edition.cnn.com/2026/07/14/example', html)).not.toContain('headerSubNav');
+  });
+});

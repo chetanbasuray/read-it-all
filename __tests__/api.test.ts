@@ -15,6 +15,7 @@ vi.mock('@vercel/kv', () => ({
     set: vi.fn().mockResolvedValue('OK'),
     expire: vi.fn().mockResolvedValue(1),
     del: vi.fn().mockResolvedValue(1),
+    incr: vi.fn().mockResolvedValue(1),
   },
 }));
 
@@ -34,6 +35,7 @@ vi.mock('@/lib/scraper', async () => {
 
 const { POST } = await import('@/app/api/bypass/route');
 const { POST: rescrapePOST } = await import('@/app/api/rescrape/route');
+const { POST: ingestPOST } = await import('@/app/api/ingest/route');
 const { scrapeArticle } = await import('@/lib/scraper');
 
 function createRequest(body: unknown, url = 'http://localhost:3000/api/bypass', headers: Record<string, string> = {}): Request {
@@ -187,6 +189,74 @@ describe('POST /api/bypass', () => {
     expect(data.title).toBe('Cached Article');
     expect(data.cached).toBe(true);
     expect(scrapeArticle).not.toHaveBeenCalled();
+  });
+});
+
+describe('rate limiting', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(scrapeArticle).mockResolvedValue({
+      title: 'T', content: '<p>c</p>', textContent: 'c', excerpt: 'c', byline: null, image: null,
+      url: 'https://example.com/article',
+    });
+  });
+
+  it('allows a request under the per-IP limit on /api/bypass', async () => {
+    const { kv } = await import('@vercel/kv');
+    vi.mocked(kv.incr).mockResolvedValue(5);
+
+    const response = await POST(
+      createRequest({ url: 'https://example.com/article' }, 'http://localhost:3000/api/bypass', {
+        'x-forwarded-for': '1.2.3.4',
+      }),
+    );
+
+    expect(response.status).not.toBe(429);
+  });
+
+  it('blocks a client that exceeds the per-IP limit on /api/bypass', async () => {
+    const { kv } = await import('@vercel/kv');
+    vi.mocked(kv.incr).mockResolvedValue(11);
+
+    const response = await POST(
+      createRequest({ url: 'https://example.com/article' }, 'http://localhost:3000/api/bypass', {
+        'x-forwarded-for': '1.2.3.4',
+      }),
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(data.error).toMatch(/too many requests/i);
+    expect(response.headers.get('Retry-After')).toBeTruthy();
+    expect(scrapeArticle).not.toHaveBeenCalled();
+  });
+
+  it('blocks a client that exceeds the per-IP limit on /api/ingest', async () => {
+    const { kv } = await import('@vercel/kv');
+    vi.mocked(kv.incr).mockResolvedValue(11);
+
+    const response = await ingestPOST(
+      createRequest(
+        { url: 'https://example.com/article', content: `<p>${'x'.repeat(250)}</p>` },
+        'http://localhost:3000/api/ingest',
+        { 'x-forwarded-for': '5.6.7.8' },
+      ),
+    );
+
+    expect(response.status).toBe(429);
+  });
+
+  it('fails open (does not rate limit) when Redis is unavailable', async () => {
+    const { kv } = await import('@vercel/kv');
+    vi.mocked(kv.incr).mockRejectedValue(new Error('redis down'));
+
+    const response = await POST(
+      createRequest({ url: 'https://example.com/article' }, 'http://localhost:3000/api/bypass', {
+        'x-forwarded-for': '9.9.9.9',
+      }),
+    );
+
+    expect(response.status).not.toBe(429);
   });
 });
 

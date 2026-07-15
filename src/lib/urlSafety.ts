@@ -85,6 +85,24 @@ export async function validateUrl(rawUrl: string): Promise<void> {
   }
 }
 
+// shared by every route that accepts a user-supplied URL to scrape, so the
+// normalize/protocol-allowlist/SSRF checks can't drift out of sync between them
+export async function normalizeAndValidateUrl(rawUrl: string): Promise<string> {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error('Invalid URL provided');
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('Only http and https URLs are supported');
+  }
+
+  await validateUrl(parsed.href);
+  return parsed.href;
+}
+
 // fetch()'s own redirect: 'follow' never re-validates the target of a 3xx,
 // letting a validated URL redirect straight to an internal address; this
 // re-runs validateUrl on every hop instead of trusting the original URL alone.

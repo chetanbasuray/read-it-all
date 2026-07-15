@@ -32,12 +32,13 @@ vi.mock('@/lib/scraper', async () => {
 });
 
 const { POST } = await import('@/app/api/bypass/route');
+const { POST: rescrapePOST } = await import('@/app/api/rescrape/route');
 const { scrapeArticle } = await import('@/lib/scraper');
 
-function createRequest(body: unknown): Request {
-  return new Request('http://localhost:3000/api/bypass', {
+function createRequest(body: unknown, url = 'http://localhost:3000/api/bypass', headers: Record<string, string> = {}): Request {
+  return new Request(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body),
   });
 }
@@ -185,6 +186,77 @@ describe('POST /api/bypass', () => {
     expect(data.title).toBe('Cached Article');
     expect(data.cached).toBe(true);
     expect(scrapeArticle).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /api/rescrape', () => {
+  const RESCRAPE_URL = 'http://localhost:3000/api/rescrape';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.RESCRAPE_TOKEN = 'test-token';
+  });
+
+  afterEach(() => {
+    delete process.env.RESCRAPE_TOKEN;
+  });
+
+  it('returns 401 when no token is configured', async () => {
+    delete process.env.RESCRAPE_TOKEN;
+    const response = await rescrapePOST(
+      createRequest({ url: 'https://example.com/article' }, RESCRAPE_URL, { Authorization: 'Bearer test-token' }),
+    );
+    expect(response.status).toBe(401);
+  });
+
+  it('returns 401 when the token is missing', async () => {
+    const response = await rescrapePOST(createRequest({ url: 'https://example.com/article' }, RESCRAPE_URL));
+    expect(response.status).toBe(401);
+  });
+
+  it('returns 401 when the token is wrong', async () => {
+    const response = await rescrapePOST(
+      createRequest({ url: 'https://example.com/article' }, RESCRAPE_URL, { Authorization: 'Bearer wrong-token' }),
+    );
+    expect(response.status).toBe(401);
+  });
+
+  it('returns 400 when URL is missing', async () => {
+    const response = await rescrapePOST(createRequest({}, RESCRAPE_URL, { Authorization: 'Bearer test-token' }));
+    expect(response.status).toBe(400);
+  });
+
+  it('scrapes and overwrites the cache even when a cache entry already exists', async () => {
+    const { kv } = await import('@vercel/kv');
+    const freshArticle = {
+      title: 'Fresh Title',
+      content: '<p>Fresh content</p>',
+      textContent: 'Fresh content',
+      excerpt: 'Fresh',
+      byline: 'Fresh Author',
+      image: null,
+      url: 'https://example.com/article',
+    };
+    vi.mocked(scrapeArticle).mockResolvedValue(freshArticle);
+
+    const response = await rescrapePOST(
+      createRequest({ url: 'https://example.com/article' }, RESCRAPE_URL, { Authorization: 'Bearer test-token' }),
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.title).toBe('Fresh Title');
+    expect(scrapeArticle).toHaveBeenCalledTimes(1);
+    expect(kv.set).toHaveBeenCalledTimes(2);
+    expect(kv.get).not.toHaveBeenCalled();
+  });
+
+  it('returns 502 when scraping fails', async () => {
+    vi.mocked(scrapeArticle).mockRejectedValue(new Error('Scraping failed'));
+    const response = await rescrapePOST(
+      createRequest({ url: 'https://example.com/article' }, RESCRAPE_URL, { Authorization: 'Bearer test-token' }),
+    );
+    expect(response.status).toBe(502);
   });
 });
 

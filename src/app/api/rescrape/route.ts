@@ -8,14 +8,23 @@ import { normalizeAndValidateUrl } from '@/lib/urlSafety';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+function tokenMatches(provided: string, expected: string): boolean {
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+// RESCRAPE_TOKEN_AGENT is a second, independently revocable secret so a token
+// handed to an external caller (e.g. an agent) never has to be the same one
+// used for personal/manual calls
 function isAuthorized(request: NextRequest): boolean {
-  const token = process.env.RESCRAPE_TOKEN;
-  if (!token) return false;
+  const validTokens = [process.env.RESCRAPE_TOKEN, process.env.RESCRAPE_TOKEN_AGENT].filter(
+    (t): t is string => !!t,
+  );
+  if (validTokens.length === 0) return false;
 
   const provided = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? '';
-  const a = Buffer.from(provided);
-  const b = Buffer.from(token);
-  return a.length === b.length && timingSafeEqual(a, b);
+  return validTokens.some((token) => tokenMatches(provided, token));
 }
 
 // internal endpoint (not linked from the UI) to force a fresh scrape and reset

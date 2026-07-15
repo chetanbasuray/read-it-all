@@ -97,7 +97,7 @@ export async function forceRescrapeArticle(url: string): Promise<ArticleData> {
   }
 }
 
-async function evictCachedArticle(url: string): Promise<void> {
+export async function evictCachedArticle(url: string): Promise<void> {
   if (!isRedisConfigured) return;
   try {
     await kv.del(getCacheKey(url));

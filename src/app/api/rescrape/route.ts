@@ -1,7 +1,7 @@
 import { timingSafeEqual } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { ScrapeError } from '@/lib/scraper';
-import { forceRescrapeArticle } from '@/lib/redis';
+import { forceRescrapeArticle, evictCachedArticle } from '@/lib/redis';
 import { cleanTrackingParams, hashUrl } from '@/lib/utils';
 import { normalizeAndValidateUrl } from '@/lib/urlSafety';
 
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { url } = body as { url?: string };
+    const { url, evictOnly } = body as { url?: string; evictOnly?: boolean };
 
     if (!url || typeof url !== 'string') {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });
@@ -54,6 +54,14 @@ export async function POST(request: NextRequest) {
     }
 
     const canonicalUrl = cleanTrackingParams(normalizedUrl);
+
+    // for takedown requests: removes the cache entry without attempting to
+    // replace it with a fresh scrape, unlike a normal rescrape
+    if (evictOnly) {
+      await evictCachedArticle(canonicalUrl);
+      return NextResponse.json({ evicted: true, url: canonicalUrl });
+    }
+
     const article = await forceRescrapeArticle(canonicalUrl);
 
     return NextResponse.json({

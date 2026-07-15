@@ -4,6 +4,7 @@ import * as cheerio from 'cheerio';
 import { sanitizeHtml } from './sanitize';
 import { safeFetch } from './urlSafety';
 import { preprocessHtmlForSite, polishArticleForSite } from './site-rules';
+import { getTakedown, type TakedownEntry } from './takedowns';
 
 async function dynamicRenderPage(url: string, cookies?: string): Promise<string> {
   const { renderPage } = await import('./browser');
@@ -28,6 +29,18 @@ export class ScrapeError extends Error {
     super(message);
     this.name = 'ScrapeError';
     this.details = details;
+  }
+}
+
+export class TakedownError extends Error {
+  entry: TakedownEntry;
+
+  constructor(entry: TakedownEntry) {
+    super(
+      `This content is not available. The publisher requested it be removed (request ${entry.requestId}). See ${entry.link} for details.`,
+    );
+    this.name = 'TakedownError';
+    this.entry = entry;
   }
 }
 
@@ -432,6 +445,13 @@ export async function scrapeArticle(
   url: string,
   cookies?: string,
 ): Promise<ArticleData> {
+  // checked first so a takedown also applies to background revalidation
+  // (refreshIfStale calls scrapeArticle directly, not through a route)
+  const takedown = getTakedown(url);
+  if (takedown) {
+    throw new TakedownError(takedown);
+  }
+
   const errors: string[] = [];
   let allBlocked = true;
 

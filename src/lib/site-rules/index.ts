@@ -2,11 +2,13 @@ import type { ArticleData } from '../scraper';
 import type { SiteRule } from './types';
 import { bbcRule } from './bbc.com';
 import { reutersRule } from './reuters.com';
+import { guardianRule } from './theguardian.com';
 
 const SITE_RULES: Record<string, SiteRule> = {
   'bbc.com': bbcRule,
   'bbc.co.uk': bbcRule,
   'reuters.com': reutersRule,
+  'theguardian.com': guardianRule,
 };
 
 function getSiteRule(url: string): SiteRule | null {

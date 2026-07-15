@@ -194,3 +194,30 @@ describe('polishArticleForSite for reuters.com', () => {
     expect(polishArticleForSite(article)).toEqual(article);
   });
 });
+
+describe('polishArticleForSite for theguardian.com', () => {
+  it('strips the newsletter-widget skip-link pair, keeping real content around it', () => {
+    const html =
+      '<p>Real paragraph one.</p>' +
+      '<figure><a href="#EmailSignup-skip-link-16">skip past newsletter promotion</a>' +
+      '<p id="EmailSignup-skip-link-16" aria-label="after newsletter promotion">after newsletter promotion</p></figure>' +
+      '<p>Real paragraph two.</p>';
+
+    const article = polishArticleForSite(
+      fakeArticle({ url: 'https://www.theguardian.com/football/2026/jul/15/example', content: html }),
+    );
+
+    expect(article.content).not.toContain('skip past');
+    expect(article.content).not.toContain('after newsletter promotion');
+    expect(article.content).toContain('Real paragraph one.');
+    expect(article.content).toContain('Real paragraph two.');
+  });
+
+  it('leaves theguardian.com content untouched when it has no skip-link widget', () => {
+    const article = fakeArticle({
+      url: 'https://www.theguardian.com/football/2026/jul/15/example',
+      content: '<p>Clean paragraph.</p>',
+    });
+    expect(polishArticleForSite(article)).toEqual(article);
+  });
+});

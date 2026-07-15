@@ -3,11 +3,27 @@ import { scrapeArticle, ScrapeError } from '@/lib/scraper';
 import { getCachedArticle, setCachedArticle } from '@/lib/redis';
 import { hashUrl, cleanTrackingParams } from '@/lib/utils';
 import { normalizeAndValidateUrl } from '@/lib/urlSafety';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+const RATE_LIMIT = 10;
+const RATE_LIMIT_WINDOW_SECONDS = 60;
+
 export async function POST(request: NextRequest) {
+  const { allowed, retryAfterSeconds } = await checkRateLimit(
+    `bypass:${getClientIp(request)}`,
+    RATE_LIMIT,
+    RATE_LIMIT_WINDOW_SECONDS,
+  );
+  if (!allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again shortly.' },
+      { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } },
+    );
+  }
+
   try {
     const body = await request.json();
     const { url, cookies } = body as { url?: string; cookies?: string };

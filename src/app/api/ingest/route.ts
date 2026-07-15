@@ -4,9 +4,13 @@ import { polishArticleForSite } from '@/lib/site-rules';
 import { setCachedArticle, getCachedArticle, getArticleViews } from '@/lib/redis';
 import { hashUrl, cleanTrackingParams } from '@/lib/utils';
 import { sanitizeHtml } from '@/lib/sanitize';
+import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+const RATE_LIMIT = 10;
+const RATE_LIMIT_WINDOW_SECONDS = 60;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -30,6 +34,18 @@ export async function OPTIONS() {
 }
 
 export async function POST(request: NextRequest) {
+  const { allowed, retryAfterSeconds } = await checkRateLimit(
+    `ingest:${getClientIp(request)}`,
+    RATE_LIMIT,
+    RATE_LIMIT_WINDOW_SECONDS,
+  );
+  if (!allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again shortly.' },
+      { status: 429, headers: { ...corsHeaders, 'Retry-After': String(retryAfterSeconds) } },
+    );
+  }
+
   try {
     let body: ArticleInput;
 

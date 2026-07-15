@@ -67,7 +67,10 @@ export default function BookmarkletPage() {
             How to install
           </h2>
           <ol className="text-sm text-gray-500 dark:text-gray-400 space-y-2 list-decimal pl-4">
-            <li>Make sure your bookmarks bar is visible (Cmd+Shift+B)</li>
+            <li>
+              Make sure your bookmarks bar is visible (Ctrl+Shift+B on Windows/Linux,
+              Cmd+Shift+B on Mac)
+            </li>
             <li>
               Drag the &quot;Read in Reader&quot; button above to your bookmarks
               bar

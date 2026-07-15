@@ -82,6 +82,28 @@ describe('preprocessHtmlForSite', () => {
     expect(result).toContain('Helen Sullivan, BBC News');
     expect(result).toContain('Real paragraph.');
   });
+
+  it('strips the match-info card, inline teasers, and tag list on BBC Sport (ssrcss-*) pages', () => {
+    const html =
+      '<html><body>' +
+      '<p>Real paragraph one.</p>' +
+      '<div class="ssrcss-yapki9-EventInformationContainer e646wox6">' +
+      '<p>Fifa World Cup 2026 semi-final</p></div>' +
+      '<ul><li class="ssrcss-qzx51b-LinkItem e3eyuya1">' +
+      '<a href="/x"><p>Unrelated headline</p></a></li></ul>' +
+      '<p>Real paragraph two.</p>' +
+      '<div class="ssrcss-nj9heb-StyledTagContainer ed0g1kj1">' +
+      '<h2>Related topics</h2><a href="/topics/football">Football</a></div>' +
+      '</body></html>';
+
+    const result = preprocessHtmlForSite('https://www.bbc.com/sport/football/articles/c456', html);
+
+    expect(result).not.toContain('Fifa World Cup 2026 semi-final');
+    expect(result).not.toContain('Unrelated headline');
+    expect(result).not.toContain('Related topics');
+    expect(result).toContain('Real paragraph one.');
+    expect(result).toContain('Real paragraph two.');
+  });
 });
 
 describe('extractArticle with BBC nav-menu regression', () => {

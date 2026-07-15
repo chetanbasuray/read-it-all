@@ -216,6 +216,17 @@ describe('sanitizeHtml', () => {
       sanitizeHtml('<strong>bold</strong> <em>italic</em> <a href="https://x.com">link</a>'),
     ).toBe('<strong>bold</strong> <em>italic</em> <a href="https://x.com">link</a>');
   });
+
+  it('strips screen-reader-only accessibility labels', () => {
+    const result = sanitizeHtml(
+      '<span class="visually-hidden">Image source, </span>Getty Images' +
+        '<span class="sr-only">Image caption, </span><p>A real caption.</p>',
+    );
+    expect(result).not.toContain('Image source,');
+    expect(result).not.toContain('Image caption,');
+    expect(result).toContain('Getty Images');
+    expect(result).toContain('A real caption.');
+  });
 });
 
 describe('validateUrl', () => {

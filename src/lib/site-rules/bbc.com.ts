@@ -15,12 +15,20 @@ const NOSCRIPT_NAV_PATTERN = /<noscript>(?:(?!<\/noscript>)[\s\S])*?NoJsNavigati
 // Google" buttons packed into the same element as the real byline text. Matched on
 // the stable component-name prefix, not the styled-components hash suffix, which
 // changes on every BBC deploy.
+//
+// BBC Sport pages are built on a different frontend (ssrcss-* classes, not the
+// Xyz-styles__XyzStyled-sc-* convention above), with its own equivalents: an
+// inline "match info" card, inline related-story teasers, and an end-of-article
+// topic tag list.
 const JUNK_SELECTORS = [
   '[class*="PortraitVideoConstraint"]',
   '[class*="LinksContainerStyled"]',
   '[class*="TagListStyled"]',
   '[class*="ActionsContainerStyled"]',
   '[class*="GooglePreferredButtonContainerStyled"]',
+  '[class*="EventInformationContainer"]',
+  '[class*="LinkItem"]',
+  '[class*="StyledTagContainer"]',
 ];
 
 function stripBbcWidgets(html: string): string {

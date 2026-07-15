@@ -51,6 +51,28 @@ function isBotChallengePage(html: string): boolean {
   return BOT_CHALLENGE_PATTERNS.some((p) => lower.includes(p.toLowerCase()));
 }
 
+// some publishers withhold the real article server-side (subscriber-only,
+// logged-out) and serve a legal AI-training notice or subscription paywall
+// wall instead, long enough to pass our length/quality thresholds; accepting
+// it would be worse than an honest failure, since the reader shows a
+// "Cached" badge as if the real article had been extracted
+const PAYWALL_BOILERPLATE_PATTERNS = [
+  /made available for your personal,?\s*non-commercial use/i,
+  /prohibited without prior written permission/i,
+  /text and data mining activities under (the )?art\.?\s*4/i,
+  /development of any software, machine learning, artificial intelligence/i,
+  /subscribe to unlock this article/i,
+  /register to unlock this article/i,
+  /to read this article for free,?\s*register/i,
+];
+
+export function isPaywallBoilerplate(article: Pick<ArticleData, 'content' | 'textContent'>): boolean {
+  // FT's subscription barrier component, a stable structural marker independent of its
+  // ever-changing marketing copy ("Subscribe"/"Register"/"$" vs "€" pricing, etc.)
+  if (article.content.includes('id="barrier-page"')) return true;
+  return PAYWALL_BOILERPLATE_PATTERNS.some((p) => p.test(article.textContent));
+}
+
 export function extractFromJsonLd(
   html: string,
 ): Pick<ArticleData, 'title' | 'content' | 'textContent' | 'byline' | 'image'> | null {
@@ -337,7 +359,7 @@ export function extractArticle(html: string, fetchUrl: string, canonicalUrl: str
 
   const jsonld = extractFromJsonLd(preprocessed);
   if (jsonld && jsonld.content && jsonld.content.length > 200) {
-    return polishArticleForSite({
+    const candidate = {
       title: jsonld.title || 'Untitled',
       content: jsonld.content,
       textContent: jsonld.textContent || '',
@@ -345,14 +367,19 @@ export function extractArticle(html: string, fetchUrl: string, canonicalUrl: str
       byline: jsonld.byline || extractAuthor(preprocessed) || null,
       image: jsonld.image || extractFirstImage(preprocessed, fetchUrl),
       url: canonicalUrl,
-    });
+    };
+    if (!isPaywallBoilerplate(candidate)) return polishArticleForSite(candidate);
   }
 
   const fromMeta = buildArticleFromMetadata(preprocessed, fetchUrl);
-  if (fromMeta) return polishArticleForSite({ ...fromMeta, url: canonicalUrl });
+  if (fromMeta && !isPaywallBoilerplate(fromMeta)) {
+    return polishArticleForSite({ ...fromMeta, url: canonicalUrl });
+  }
 
   const article = parseWithReadability(preprocessed, fetchUrl);
-  if (article) return polishArticleForSite({ ...article, url: canonicalUrl });
+  if (article && !isPaywallBoilerplate(article)) {
+    return polishArticleForSite({ ...article, url: canonicalUrl });
+  }
 
   return null;
 }

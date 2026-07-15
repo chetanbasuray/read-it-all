@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ScrapeError, extractFirstImage, extractAuthor } from '@/lib/scraper';
+import { ScrapeError, extractFirstImage, extractAuthor, extractArticle, isPaywallBoilerplate } from '@/lib/scraper';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { validateUrl, safeFetch } from '@/lib/urlSafety';
 
@@ -476,6 +476,74 @@ describe('extractAuthor', () => {
 
   it('returns null when no author found', () => {
     expect(extractAuthor('<p>no byline here</p>')).toBeNull();
+  });
+});
+
+describe('isPaywallBoilerplate', () => {
+  it('flags NYT-style AI-training/data-mining legal notices', () => {
+    const content =
+      '<h2>New York Times content is made available for your personal, non-commercial use subject to our Terms of Service.</h2>' +
+      '<p>Use of any device, tool, or process designed to data mine or scrape the content using automated means is prohibited without prior written permission from The New York Times Company.</p>' +
+      '<ol><li>text and data mining activities under Art. 4 of the EU Directive on Copyright in the Digital Single Market;</li>' +
+      '<li>the development of any software, machine learning, artificial intelligence (AI), and/or large language models (LLMs);</li></ol>';
+    expect(isPaywallBoilerplate({ content, textContent: content.replace(/<[^>]*>/g, '') })).toBe(true);
+  });
+
+  it('flags FT-style subscription barrier pages by structural marker', () => {
+    const content = '<div id="barrier-page"><span>Subscribe to unlock this article</span></div>';
+    expect(isPaywallBoilerplate({ content, textContent: 'Subscribe to unlock this article' })).toBe(true);
+  });
+
+  it('flags FT-style paywall copy even without the structural marker', () => {
+    const textContent = 'To read this article for free, Register now. Standard Digital: $45 per month.';
+    expect(isPaywallBoilerplate({ content: `<p>${textContent}</p>`, textContent })).toBe(true);
+  });
+
+  it('does not flag a real article', () => {
+    const textContent =
+      'Taslima Nasreen\'s planned return to Kolkata after nearly two decades has triggered a political face-off in West Bengal.';
+    expect(isPaywallBoilerplate({ content: `<p>${textContent}</p>`, textContent })).toBe(false);
+  });
+});
+
+describe('extractArticle rejects paywall/legal boilerplate', () => {
+  it('falls through to null when JSON-LD articleBody is an AI-training legal notice', () => {
+    const html =
+      '<html><head><script type="application/ld+json">' +
+      JSON.stringify({
+        '@type': 'NewsArticle',
+        headline: 'How Putin Turned Japan Into a Den of Spies',
+        articleBody:
+          'New York Times content is made available for your personal, non-commercial use subject to our Terms of Service. ' +
+          'Use of any device, tool, or process designed to data mine or scrape the content using automated means is ' +
+          'prohibited without prior written permission from The New York Times Company. This includes text and data ' +
+          'mining activities under Art. 4 of the EU Directive on Copyright in the Digital Single Market and the ' +
+          'development of any software, machine learning, artificial intelligence (AI), and/or large language models (LLMs).',
+      }) +
+      '</script></head><body></body></html>';
+
+    expect(extractArticle(html, 'https://www.nytimes.com/2026/07/12/example.html')).toBeNull();
+  });
+
+  it('falls through to null when Readability extracts an FT-style subscription barrier', () => {
+    const html =
+      '<html><body><article><div id="barrier-page">' +
+      '<h2>Subscribe to unlock this article</h2>' +
+      '<p>Try unlimited access for just 1 for 4 weeks, then 69 per month. Complete digital access to quality FT journalism on any device.</p>' +
+      '</div></article></body></html>';
+
+    expect(extractArticle(html, 'https://www.ft.com/content/example')).toBeNull();
+  });
+
+  it('still extracts a real article normally', () => {
+    const html =
+      '<html><body><article><h1>Real headline</h1><p>' +
+      'This is a real article body with enough substance to be extracted correctly. '.repeat(10) +
+      '</p></article></body></html>';
+
+    const article = extractArticle(html, 'https://example.com/article');
+    expect(article).not.toBeNull();
+    expect(article?.textContent).toContain('real article body');
   });
 });
 

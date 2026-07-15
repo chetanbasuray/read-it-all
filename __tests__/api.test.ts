@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ScrapeError, extractFirstImage } from '@/lib/scraper';
+import { ScrapeError, extractFirstImage, extractAuthor } from '@/lib/scraper';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { validateUrl, safeFetch } from '@/lib/urlSafety';
 
@@ -332,6 +332,22 @@ describe('extractFirstImage', () => {
       'https://example.com/article',
     );
     expect(result).toBeNull();
+  });
+});
+
+describe('extractAuthor', () => {
+  it('picks meta[name=author] over class-based selectors', () => {
+    const result = extractAuthor('<meta name="author" content="Jane Doe" /><div class="byline">Someone Else</div>');
+    expect(result).toBe('Jane Doe');
+  });
+
+  it('matches class names case-insensitively', () => {
+    const result = extractAuthor('<div class="Byline-styles__BylineStyled-sc-1">Helen Sullivan, BBC News</div>');
+    expect(result).toBe('Helen Sullivan, BBC News');
+  });
+
+  it('returns null when no author found', () => {
+    expect(extractAuthor('<p>no byline here</p>')).toBeNull();
   });
 });
 

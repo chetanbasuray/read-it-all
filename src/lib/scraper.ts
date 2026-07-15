@@ -129,7 +129,7 @@ export function extractAuthor(html: string): string | null {
   const $ = cheerio.load(html);
   const author = $('meta[name="author"]').attr('content');
   if (author) return author;
-  const byline = $('[class*="byline"], [class*="author"], [class*="by-line"]').first().text().trim();
+  const byline = $('[class*="byline" i], [class*="author" i], [class*="by-line" i]').first().text().trim();
   if (byline) return byline;
   return null;
 }

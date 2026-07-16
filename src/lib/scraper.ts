@@ -207,6 +207,29 @@ async function fetchWithUA(
   }
 }
 
+// mimics a visitor landing on the homepage before navigating to an article,
+// picking up whatever session/consent cookies a cold article-URL request wouldn't
+async function fetchWarmupCookies(url: string, ua: string): Promise<string | null> {
+  try {
+    const homepageUrl = new URL(url).origin;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    const response = await safeFetch(homepageUrl, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': ua,
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+    });
+    clearTimeout(timeout);
+    const setCookies = response.headers.getSetCookie();
+    if (setCookies.length === 0) return null;
+    return setCookies.map((c) => c.split(';')[0]).join('; ');
+  } catch {
+    return null;
+  }
+}
+
 async function fetchFromGoogleCache(url: string): Promise<string | null> {
   try {
     const cacheUrl = `https://webcache.googleusercontent.com/search?q=cache:${encodeURIComponent(url)}&strip=1&vwsrc=0`;
@@ -365,8 +388,8 @@ function $tryExtractContentFromNoscript(html: string): string | null {
   return null;
 }
 
-// shared by every fallback tier (direct fetch, AMP, browser render, Google Cache, Wayback)
-// so a per-domain rule only needs to be wired in once.
+// shared by every fallback tier (direct fetch, warmup, AMP, browser render,
+// Google Cache, Wayback) so a per-domain rule only needs to be wired in once.
 // fetchUrl is what was actually requested/parsed (matters for relative image resolution
 // on an AMP page); canonicalUrl is what gets stored as article.url for display/caching.
 export function extractArticle(html: string, fetchUrl: string, canonicalUrl: string = fetchUrl): ArticleData | null {
@@ -481,6 +504,21 @@ async function attemptScrape(
       const article = extractArticle(html, url);
       if (article) return { article, tier: 'direct-fetch' };
     }
+  }
+
+  // cheaper than an AMP retry or full browser render: fetch the homepage first
+  // to pick up session/consent cookies a cold article request never gets offered
+  const warmupCookies = await fetchWarmupCookies(url, USER_AGENTS[0].ua);
+  if (warmupCookies) {
+    const mergedCookies = cookies ? `${cookies}; ${warmupCookies}` : warmupCookies;
+    const { html, blocked } = await fetchWithUA(url, USER_AGENTS[0].ua, undefined, mergedCookies);
+    if (html && !blocked && html.length > 500) {
+      const article = extractArticle(html, url);
+      if (article) return { article, tier: 'warmup' };
+    }
+    errors.push('Domain warmup did not yield article content');
+  } else {
+    errors.push('Domain warmup: homepage set no cookies');
   }
 
   if (allBlocked) {

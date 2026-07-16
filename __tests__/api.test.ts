@@ -487,7 +487,7 @@ describe('GET /api/domain-stats', () => {
       {
         domain: 'example.com',
         total: 5,
-        tiers: { 'direct-fetch': 5, amp: 0, 'browser-render': 0, 'google-cache': 0, wayback: 0, failed: 0 },
+        tiers: { 'direct-fetch': 5, warmup: 0, amp: 0, 'browser-render': 0, 'google-cache': 0, wayback: 0, failed: 0 },
         successRate: 1,
       },
     ]);

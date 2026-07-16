@@ -220,6 +220,28 @@ describe('polishArticleForSite for theguardian.com', () => {
     });
     expect(polishArticleForSite(article)).toEqual(article);
   });
+
+  it('strips the trailing "Explore more on these topics" and "Most viewed" modules', () => {
+    const html =
+      '<div><p>Real paragraph one.</p>' +
+      '<p>Real paragraph two.</p>' +
+      '<div><span>Explore more on these topics</span>' +
+      '<div><ul><li><a href="/technology/uber">Uber</a></li></ul></div>' +
+      '<div><a href="mailto:?subject=x">Share</a></div></div></div>' +
+      '<div><span><div><div><div><h3>Most viewed</h3>' +
+      '<ul><li><a href="/x">Unrelated trending story</a></li></ul>' +
+      '</div></div></div></span></div>';
+
+    const article = polishArticleForSite(
+      fakeArticle({ url: 'https://www.theguardian.com/technology/2026/jul/16/example', content: html }),
+    );
+
+    expect(article.content).not.toContain('Explore more on these topics');
+    expect(article.content).not.toContain('Most viewed');
+    expect(article.content).not.toContain('Unrelated trending story');
+    expect(article.content).toContain('Real paragraph one.');
+    expect(article.content).toContain('Real paragraph two.');
+  });
 });
 
 describe('preprocessHtmlForSite for cnn.com', () => {
@@ -496,6 +518,62 @@ describe('polishArticleForSite for dailymail.co.uk', () => {
       url: 'https://www.dailymail.co.uk/news/article-1/example.html',
       content: '<p>Clean paragraph.</p>',
     });
+    expect(polishArticleForSite(article)).toEqual(article);
+  });
+});
+
+describe('polishArticleForSite for theverge.com', () => {
+  const url = 'https://www.theverge.com/tech/1/example';
+
+  it('strips follow-topic breadcrumb/footer tags but keeps the byline name', () => {
+    const html =
+      '<span><ul><li><div id="follow-category-breadcrumb-1"><span>Tech</span>' +
+      '<div><p>Posts from this topic will be added to your daily email digest and your homepage feed.</p>' +
+      '<span>Follow</span></div></div></li></ul></span>' +
+      '<h1>Real headline</h1>' +
+      '<span aria-haspopup="true"><span id="follow-author-author_byline_lead-1"><span>Real Author</span></span>' +
+      '<div><p>Posts from this author will be added to your daily email digest and your homepage feed.</p>' +
+      '<span>Follow</span></div></span>' +
+      '<p>Real paragraph.</p>' +
+      '<li><div id="follow-category-article_footer-1"><span>Tech</span></div></li>';
+
+    const article = polishArticleForSite(fakeArticle({ url, content: html }));
+
+    expect(article.content).not.toContain('Posts from this topic');
+    expect(article.content).not.toContain('Posts from this author');
+    expect(article.content).not.toContain('>Tech<');
+    expect(article.content).toContain('Real headline');
+    expect(article.content).toContain('Real Author');
+    expect(article.content).toContain('Real paragraph.');
+  });
+
+  it('strips everything from the layout rail onward (ads, related stories, newsletter)', () => {
+    const html =
+      '<p>Real paragraph.</p>' +
+      '<div class="duet--layout--rail noh1q10"><div class="m-ad">ad</div>' +
+      '<ol><li>Unrelated related story</li></ol>' +
+      '<div class="duet--cta--newsletter">Sign Up</div></div>';
+
+    const article = polishArticleForSite(fakeArticle({ url, content: html }));
+
+    expect(article.content).not.toContain('Unrelated related story');
+    expect(article.content).not.toContain('Sign Up');
+    expect(article.content).toContain('Real paragraph.');
+  });
+
+  it('strips the closing "Follow topics and authors" nag', () => {
+    const html =
+      '<p>Real paragraph.</p>' +
+      '<div><span><strong>Follow topics and authors</strong> from this story to see more like this.</span></div>';
+
+    const article = polishArticleForSite(fakeArticle({ url, content: html }));
+
+    expect(article.content).not.toContain('Follow topics and authors');
+    expect(article.content).toContain('Real paragraph.');
+  });
+
+  it('leaves content untouched when none of the known junk is present', () => {
+    const article = fakeArticle({ url, content: '<p>Clean paragraph.</p>' });
     expect(polishArticleForSite(article)).toEqual(article);
   });
 });

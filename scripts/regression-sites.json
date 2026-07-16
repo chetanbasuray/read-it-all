@@ -1,0 +1,57 @@
+[
+  {
+    "domain": "bbc.com",
+    "url": "https://www.bbc.com/news/articles/c07y77exx8eo",
+    "status": "known-good"
+  },
+  {
+    "domain": "theguardian.com",
+    "url": "https://www.theguardian.com/business/2026/jul/16/why-did-ryanair-air-malta-plane-window-blow-out-mid-air-and-could-it-happen-again",
+    "status": "known-good"
+  },
+  {
+    "domain": "telegraph.co.uk",
+    "url": "https://www.telegraph.co.uk/news/2026/05/25/schoolboys-ai-girlfriends/",
+    "status": "known-good",
+    "note": "No site rule needed: extracted cleanly via JSON-LD despite the site's own hard paywall."
+  },
+  {
+    "domain": "timesofindia.indiatimes.com",
+    "url": "https://timesofindia.indiatimes.com/city/ghaziabad/wanted-papers-for-his-share-drunk-son-pumps-3-bullets-into-father-in-ghaziabad-over-rs-150-crore-property-dispute/articleshow/132432885.cms",
+    "status": "known-good"
+  },
+  {
+    "domain": "bylinetimes.com",
+    "url": "https://bylinetimes.com/2026/02/02/tommy-robinson-and-the-london-news-website-linked-to-a-putin-backed-propaganda-network/",
+    "status": "known-good"
+  },
+  {
+    "domain": "pcmag.com",
+    "url": "https://www.pcmag.com/news/oneplus-will-reportedly-close-up-shop-in-the-us-europe-this-week",
+    "status": "known-good",
+    "note": "Cloudflare-protected; direct fetch fails but the browser-render fallback gets through, so this run may be slow."
+  },
+  {
+    "domain": "dailymail.co.uk",
+    "url": "https://www.dailymail.co.uk/health/article-15981541/Alzheimers-wonder-drug-delay-disease-three-years-90-brain-damage-vanished-new-trial.html",
+    "status": "known-good"
+  },
+  {
+    "domain": "reuters.com",
+    "url": "https://www.reuters.com/world/asia-pacific/nine-killed-pakistan-administered-kashmir-clashes-2026-07-14/",
+    "status": "known-hard",
+    "note": "DataDome-blocked, see #23. Intermittent: has been observed working on some days and not others."
+  },
+  {
+    "domain": "cnn.com",
+    "url": "https://edition.cnn.com/2026/07/13/americas/argentina-goldfish-sentient-latam-intl",
+    "status": "known-hard",
+    "note": "CNN blocks Vercel's datacenter IP range specifically. Will likely pass when this script is run from a non-Vercel IP (e.g. locally) but fail in production; check production behavior separately."
+  },
+  {
+    "domain": "timesofisrael.com",
+    "url": "https://www.timesofisrael.com/government-okays-shin-bet-to-fight-crime-in-arab-society-sparking-rights-concerns/",
+    "status": "known-hard",
+    "note": "Inconsistent bot-challenge (a Cloudflare-Turnstile-style 'Just a quick check…' interstitial) blocks some requests but not others."
+  }
+]

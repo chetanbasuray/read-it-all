@@ -16,6 +16,10 @@ vi.mock('@vercel/kv', () => ({
     expire: vi.fn().mockResolvedValue(1),
     del: vi.fn().mockResolvedValue(1),
     incr: vi.fn().mockResolvedValue(1),
+    sadd: vi.fn().mockResolvedValue(1),
+    hincrby: vi.fn().mockResolvedValue(1),
+    smembers: vi.fn().mockResolvedValue([]),
+    hgetall: vi.fn().mockResolvedValue(null),
   },
 }));
 
@@ -44,6 +48,7 @@ vi.mock('@/lib/takedowns', async () => {
 const { POST } = await import('@/app/api/bypass/route');
 const { POST: rescrapePOST } = await import('@/app/api/rescrape/route');
 const { POST: ingestPOST } = await import('@/app/api/ingest/route');
+const { GET: domainStatsGET } = await import('@/app/api/domain-stats/route');
 const { scrapeArticle } = await import('@/lib/scraper');
 const { getTakedown } = await import('@/lib/takedowns');
 
@@ -440,6 +445,52 @@ describe('takedowns integration', () => {
 
     expect(response.status).toBe(451);
     expect(data.error).toContain('gh-2');
+  });
+});
+
+describe('GET /api/domain-stats', () => {
+  const STATS_URL = 'http://localhost:3000/api/domain-stats';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    process.env.RESCRAPE_TOKEN = 'test-token';
+  });
+
+  afterEach(() => {
+    delete process.env.RESCRAPE_TOKEN;
+  });
+
+  it('returns 401 without a token', async () => {
+    const response = await domainStatsGET(new Request(STATS_URL));
+    expect(response.status).toBe(401);
+  });
+
+  it('returns 401 with the wrong token', async () => {
+    const response = await domainStatsGET(
+      new Request(STATS_URL, { headers: { Authorization: 'Bearer wrong' } }),
+    );
+    expect(response.status).toBe(401);
+  });
+
+  it('returns domain stats with a valid token', async () => {
+    const { kv } = await import('@vercel/kv');
+    vi.mocked(kv.smembers).mockResolvedValueOnce(['example.com']);
+    vi.mocked(kv.hgetall).mockResolvedValueOnce({ total: 5, 'direct-fetch': 5 });
+
+    const response = await domainStatsGET(
+      new Request(STATS_URL, { headers: { Authorization: 'Bearer test-token' } }),
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.domains).toEqual([
+      {
+        domain: 'example.com',
+        total: 5,
+        tiers: { 'direct-fetch': 5, amp: 0, 'browser-render': 0, 'google-cache': 0, wayback: 0, failed: 0 },
+        successRate: 1,
+      },
+    ]);
   });
 });
 

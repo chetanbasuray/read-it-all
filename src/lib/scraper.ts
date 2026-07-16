@@ -5,6 +5,7 @@ import { sanitizeHtml } from './sanitize';
 import { safeFetch } from './urlSafety';
 import { preprocessHtmlForSite, polishArticleForSite } from './site-rules';
 import { getTakedown, type TakedownEntry } from './takedowns';
+import { recordDomainOutcome, type ScrapeTier } from './domainStats';
 
 async function dynamicRenderPage(url: string, cookies?: string): Promise<string> {
   const { renderPage } = await import('./browser');
@@ -442,10 +443,10 @@ const ACCEPT_VARIANTS = [
   { Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8' },
 ];
 
-export async function scrapeArticle(
+async function attemptScrape(
   url: string,
   cookies?: string,
-): Promise<ArticleData> {
+): Promise<{ article: ArticleData; tier: ScrapeTier }> {
   // checked first so a takedown also applies to background revalidation
   // (refreshIfStale calls scrapeArticle directly, not through a route)
   const takedown = getTakedown(url);
@@ -478,7 +479,7 @@ export async function scrapeArticle(
       }
 
       const article = extractArticle(html, url);
-      if (article) return article;
+      if (article) return { article, tier: 'direct-fetch' };
     }
   }
 
@@ -496,7 +497,7 @@ export async function scrapeArticle(
         }, cookies);
         if (html && !blocked && html.length > 500) {
           const article = extractArticle(html, ampUrl, url);
-          if (article) return article;
+          if (article) return { article, tier: 'amp' };
         }
       }
       errors.push('AMP URL also blocked');
@@ -510,7 +511,7 @@ export async function scrapeArticle(
     const browserHtml = await dynamicRenderPage(url, cookies);
     if (browserHtml && browserHtml.length > 500 && !isBotChallengePage(browserHtml)) {
       const article = extractArticle(browserHtml, url);
-      if (article) return article;
+      if (article) return { article, tier: 'browser-render' };
     }
     errors.push('Browser rendering did not yield article content');
   } catch (e) {
@@ -524,7 +525,7 @@ export async function scrapeArticle(
   const googleHtml = await fetchFromGoogleCache(url);
   if (googleHtml) {
     const article = extractArticle(googleHtml, url);
-    if (article) return article;
+    if (article) return { article, tier: 'google-cache' };
   } else {
     errors.push('Google Cache: no snapshot available');
   }
@@ -532,7 +533,7 @@ export async function scrapeArticle(
   const waybackHtml = await fetchFromWayback(url);
   if (waybackHtml) {
     const article = extractArticle(waybackHtml, url);
-    if (article) return article;
+    if (article) return { article, tier: 'wayback' };
   } else {
     errors.push('Wayback Machine: no snapshot available or rate-limited');
   }
@@ -550,4 +551,19 @@ export async function scrapeArticle(
     'Try opening the original URL directly in your browser.',
     errors,
   );
+}
+
+export async function scrapeArticle(url: string, cookies?: string): Promise<ArticleData> {
+  try {
+    const { article, tier } = await attemptScrape(url, cookies);
+    void recordDomainOutcome(url, tier);
+    return article;
+  } catch (error) {
+    // a takedown is an intentional block, not a scraping-quality signal, so it
+    // should not count against a domain's success rate
+    if (!(error instanceof TakedownError)) {
+      void recordDomainOutcome(url, 'failed');
+    }
+    throw error;
+  }
 }

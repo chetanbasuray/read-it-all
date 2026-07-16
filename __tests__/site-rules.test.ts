@@ -419,3 +419,83 @@ describe('preprocessHtmlForSite for bylinetimes.com', () => {
     expect(preprocessHtmlForSite(url, html)).toContain('Clean paragraph.');
   });
 });
+
+describe('preprocessHtmlForSite for pcmag.com', () => {
+  const url = 'https://www.pcmag.com/news/example-article';
+
+  it('marks the real byline link so the generic author selector finds it', () => {
+    const html =
+      '<html><body><p>Real paragraph.</p>' +
+      '<div id="author-byline"><span class="font-semibold">By ' +
+      '<a data-element="author-name" href="/authors/jane-doe">Jane Doe</a></span>' +
+      '<span>July 14, 2026</span></div>' +
+      '</body></html>';
+
+    const result = preprocessHtmlForSite(url, html);
+
+    expect(result).toContain('byline-marker');
+  });
+
+  it('strips the related-stories, author-bio, and dig-deeper widgets', () => {
+    const html =
+      '<html><body>' +
+      '<p>Real paragraph one.</p>' +
+      '<div data-parent-group="related-stories"><h3>Recommended by Our Editors</h3></div>' +
+      '<section data-parent-group="author-bio"><h2>About Our Expert</h2></section>' +
+      '<p>Real paragraph two.</p>' +
+      '<div data-parent-group="dig-deeper"><h3>Weekend Project</h3></div>' +
+      '</body></html>';
+
+    const result = preprocessHtmlForSite(url, html);
+
+    expect(result).not.toContain('Recommended by Our Editors');
+    expect(result).not.toContain('About Our Expert');
+    expect(result).not.toContain('Weekend Project');
+    expect(result).toContain('Real paragraph one.');
+    expect(result).toContain('Real paragraph two.');
+  });
+
+  it('leaves content untouched when none of the known junk is present', () => {
+    const html = '<html><body><p>Clean paragraph.</p></body></html>';
+    expect(preprocessHtmlForSite(url, html)).toContain('Clean paragraph.');
+  });
+});
+
+describe('polishArticleForSite for dailymail.co.uk', () => {
+  it('strips the Published/Updated timestamp paragraph and the Google-preferred-source bullet', () => {
+    const html =
+      '<p>Real paragraph one.</p>' +
+      '<p><span>Published: 22:37 BST, 15 July 2026</span> | <span>Updated: 22:51 BST, 15 July 2026</span></p>' +
+      '<ul><li><strong>See more Daily Mail on Google - <a href="#">save us as a Preferred Source</a></strong></li></ul>' +
+      '<p>Real paragraph two.</p>';
+
+    const article = polishArticleForSite(
+      fakeArticle({ url: 'https://www.dailymail.co.uk/news/article-1/example.html', content: html }),
+    );
+
+    expect(article.content).not.toContain('Published:');
+    expect(article.content).not.toContain('Preferred Source');
+    expect(article.content).toContain('Real paragraph one.');
+    expect(article.content).toContain('Real paragraph two.');
+  });
+
+  it('applies the same rule to dailymail.com and dailymail.co.uk', () => {
+    const html = '<p>Published: today</p><p>Real.</p>';
+    const comArticle = polishArticleForSite(
+      fakeArticle({ url: 'https://www.dailymail.com/news/article-1/example.html', content: html }),
+    );
+    const coUkArticle = polishArticleForSite(
+      fakeArticle({ url: 'https://www.dailymail.co.uk/news/article-1/example.html', content: html }),
+    );
+    expect(comArticle.content).not.toContain('Published:');
+    expect(coUkArticle.content).not.toContain('Published:');
+  });
+
+  it('leaves content untouched when none of the known junk is present', () => {
+    const article = fakeArticle({
+      url: 'https://www.dailymail.co.uk/news/article-1/example.html',
+      content: '<p>Clean paragraph.</p>',
+    });
+    expect(polishArticleForSite(article)).toEqual(article);
+  });
+});

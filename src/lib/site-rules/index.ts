@@ -7,6 +7,8 @@ import { cnnRule } from './cnn.com';
 import { toiRule } from './indiatimes.com';
 import { toiIsraelRule } from './timesofisrael.com';
 import { bylineTimesRule } from './bylinetimes.com';
+import { pcmagRule } from './pcmag.com';
+import { dailyMailRule } from './dailymail.co.uk';
 
 const SITE_RULES: Record<string, SiteRule> = {
   'bbc.com': bbcRule,
@@ -18,6 +20,9 @@ const SITE_RULES: Record<string, SiteRule> = {
   'timesofindia.indiatimes.com': toiRule,
   'timesofisrael.com': toiIsraelRule,
   'bylinetimes.com': bylineTimesRule,
+  'pcmag.com': pcmagRule,
+  'dailymail.co.uk': dailyMailRule,
+  'dailymail.com': dailyMailRule,
 };
 
 function getSiteRule(url: string): SiteRule | null {

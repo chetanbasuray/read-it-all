@@ -9,6 +9,7 @@ import { toiIsraelRule } from './timesofisrael.com';
 import { bylineTimesRule } from './bylinetimes.com';
 import { pcmagRule } from './pcmag.com';
 import { dailyMailRule } from './dailymail.co.uk';
+import { vergeRule } from './theverge.com';
 
 const SITE_RULES: Record<string, SiteRule> = {
   'bbc.com': bbcRule,
@@ -23,6 +24,7 @@ const SITE_RULES: Record<string, SiteRule> = {
   'pcmag.com': pcmagRule,
   'dailymail.co.uk': dailyMailRule,
   'dailymail.com': dailyMailRule,
+  'theverge.com': vergeRule,
 };
 
 function getSiteRule(url: string): SiteRule | null {

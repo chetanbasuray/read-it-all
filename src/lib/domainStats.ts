@@ -2,6 +2,7 @@ import { kv } from '@vercel/kv';
 
 export type ScrapeTier =
   | 'direct-fetch'
+  | 'warmup'
   | 'amp'
   | 'browser-render'
   | 'google-cache'
@@ -10,6 +11,7 @@ export type ScrapeTier =
 
 const ALL_TIERS: ScrapeTier[] = [
   'direct-fetch',
+  'warmup',
   'amp',
   'browser-render',
   'google-cache',

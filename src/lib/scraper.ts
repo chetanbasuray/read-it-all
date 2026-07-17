@@ -47,11 +47,14 @@ export class TakedownError extends Error {
 
 // bare "Cloudflare" is deliberately excluded: countless legitimate sites
 // serve it as a CDN (e.g. via Rocket Loader) with no challenge page at all,
-// so it was a false-positive block on any of them; the patterns below are
-// specific enough to genuine challenge/interstitial pages on their own
+// so it was a false-positive block on any of them. "Enable JavaScript" /
+// "Please enable JS" are excluded too: they are the standard React/Vue/etc
+// no-JS <noscript> fallback text (and video.js's own no-JS fallback), present
+// on countless ordinary SPAs that have nothing to do with a bot challenge.
+// The patterns below are specific enough to genuine challenge/interstitial
+// pages on their own.
 const BOT_CHALLENGE_PATTERNS = [
   'captcha-delivery.com',
-  'Please enable JS',
   'disable any ad blocker',
   'Checking your browser',
   'DDoS protection',
@@ -61,7 +64,6 @@ const BOT_CHALLENGE_PATTERNS = [
   'just a quick check',
   'attention required',
   'Access denied',
-  'Enable JavaScript',
 ];
 
 function isBotChallengePage(html: string): boolean {
@@ -82,6 +84,7 @@ const PAYWALL_BOILERPLATE_PATTERNS = [
   /subscribe to unlock this article/i,
   /register to unlock this article/i,
   /to read this article for free,?\s*register/i,
+  /continue reading (your|this) article with an?\s*\S+\s*subscription/i,
 ];
 
 export function isPaywallBoilerplate(article: Pick<ArticleData, 'content' | 'textContent'>): boolean {
@@ -183,7 +186,13 @@ export function extractAuthor(html: string): string | null {
   const $ = cheerio.load(html);
   const author = $('meta[name="author"]').attr('content');
   if (author) return author;
-  const byline = $('[class*="byline" i], [class*="author" i], [class*="by-line" i]').first().text().trim();
+  // a byline can span sibling elements ("By" + a linked name), leaving the
+  // source's own indentation/newlines between them in the joined text
+  const byline = $('[class*="byline" i], [class*="author" i], [class*="by-line" i]')
+    .first()
+    .text()
+    .replace(/\s+/g, ' ')
+    .trim();
   if (byline) return byline;
   return null;
 }
@@ -353,12 +362,16 @@ export function parseWithReadability(html: string, url: string): ArticleData | n
     const article = reader.parse();
 
     if (article && article.content && article.content.length > 200) {
+      // Readability's own byline detection can join sibling DOM text nodes
+      // (e.g. "By" and a linked name) with the source's original indentation/
+      // newlines still between them; no legitimate byline needs that whitespace
+      const rawByline = article.byline || extractAuthor(html) || null;
       return {
         title: article.title || extractTitle(html) || 'Untitled',
         content: sanitizeHtml(article.content),
         textContent: article.textContent || '',
         excerpt: article.excerpt || article.textContent?.substring(0, 200) || '',
-        byline: article.byline || extractAuthor(html) || null,
+        byline: rawByline ? rawByline.replace(/\s+/g, ' ').trim() : null,
         image: extractFirstImage(html, url),
         url,
       };

@@ -676,6 +676,11 @@ describe('extractAuthor', () => {
   it('returns null when no author found', () => {
     expect(extractAuthor('<p>no byline here</p>')).toBeNull();
   });
+
+  it('collapses internal whitespace between sibling byline text nodes', () => {
+    const result = extractAuthor('<div class="byline">By&nbsp;\n            <a href="/author">ANNIKA HAMMERSCHLAG</a></div>');
+    expect(result).toBe('By ANNIKA HAMMERSCHLAG');
+  });
 });
 
 describe('isPaywallBoilerplate', () => {
@@ -695,6 +700,11 @@ describe('isPaywallBoilerplate', () => {
 
   it('flags FT-style paywall copy even without the structural marker', () => {
     const textContent = 'To read this article for free, Register now. Standard Digital: $45 per month.';
+    expect(isPaywallBoilerplate({ content: `<p>${textContent}</p>`, textContent })).toBe(true);
+  });
+
+  it('flags WSJ-style "continue reading with a subscription" copy', () => {
+    const textContent = 'Continue reading your article with a WSJ subscription Subscribe Now Already a subscriber? Sign In';
     expect(isPaywallBoilerplate({ content: `<p>${textContent}</p>`, textContent })).toBe(true);
   });
 

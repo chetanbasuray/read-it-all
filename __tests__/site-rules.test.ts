@@ -765,3 +765,132 @@ describe('polishArticleForSite for arstechnica.com', () => {
     expect(polishArticleForSite(article)).toEqual(article);
   });
 });
+
+describe('preprocessHtmlForSite for eurogamer.net', () => {
+  const url = 'https://www.eurogamer.net/example-article';
+
+  it('strips the breadcrumb nav, the "Preferred Source" CTA, and lazy-load noscript image fallbacks', () => {
+    const html =
+      '<div class="breadcrumbs"><nav data-component="nav-breadcrumbs"><ul><li><a href="/">Home</a></li></ul></nav></div>' +
+      '<h1>Real headline</h1>' +
+      '<noscript><img src="/image.jpg" alt="' + 'x'.repeat(600) + '"></noscript>' +
+      '<p>Real paragraph one.</p>' +
+      '<div data-component="preferred-source">Love Eurogamer.net? Make us a Preferred Source on Google.</div>';
+
+    const result = preprocessHtmlForSite(url, html);
+
+    expect(result).not.toContain('nav-breadcrumbs');
+    expect(result).not.toContain('Preferred Source on Google');
+    expect(result).not.toContain('noscript');
+    expect(result).toContain('Real headline');
+    expect(result).toContain('Real paragraph one.');
+  });
+});
+
+describe('preprocessHtmlForSite for dexerto.com', () => {
+  const url = 'https://www.dexerto.com/gaming/example-article/';
+
+  it('strips the "Trending" rail and every <aside> (in-body ads, featured articles, signup)', () => {
+    const html =
+      '<nav><h2>Trending</h2><ul><li><a href="/gta/">GTA 6</a></li></ul></nav>' +
+      '<h1>Real headline</h1>' +
+      '<p>Real paragraph one.</p>' +
+      '<aside><div>Article continues after ad</div></aside>' +
+      '<p>Real paragraph two.</p>' +
+      '<aside><h2>Featured Articles</h2><span>Sign up to Dexerto</span></aside>';
+
+    const result = preprocessHtmlForSite(url, html);
+
+    expect(result).not.toContain('Trending');
+    expect(result).not.toContain('Featured Articles');
+    expect(result).not.toContain('Sign up to Dexerto');
+    expect(result).toContain('Real headline');
+    expect(result).toContain('Real paragraph one.');
+    expect(result).toContain('Real paragraph two.');
+  });
+});
+
+describe('polishArticleForSite for cnbc.com', () => {
+  const url = 'https://www.cnbc.com/2026/07/17/example-article.html';
+
+  it('strips the article header, the Google-preferred-source CTA, and the watch-live rail', () => {
+    const html =
+      '<div id="main-article-header"><span>Tech</span><a>Kai Nicol-Schwarz</a><a href="/live-tv/">WATCH LIVE</a></div>' +
+      '<p>Real paragraph one.</p>' +
+      '<div data-module="GooglePreferredSource">Choose CNBC as your preferred source on Google.</div>' +
+      '<div id="RegularArticle-WatchLiveRightRail-8"><a href="/live-tv/">WATCH LIVESTREAM</a></div>';
+
+    const article = polishArticleForSite(fakeArticle({ url, content: html }));
+
+    expect(article.content).not.toContain('WATCH LIVE');
+    expect(article.content).not.toContain('preferred source on Google');
+    expect(article.content).not.toContain('WATCH LIVESTREAM');
+    expect(article.content).toContain('Real paragraph one.');
+  });
+
+  it('leaves content untouched when none of the known junk is present', () => {
+    const article = fakeArticle({ url, content: '<p>Clean paragraph.</p>' });
+    expect(polishArticleForSite(article)).toEqual(article);
+  });
+});
+
+describe('site rules for ign.com', () => {
+  const url = 'https://www.ign.com/articles/example-article';
+
+  it('strips the "Preferred Sources" button, the IGN Recommends module, and the object-summary embed', () => {
+    const html =
+      '<h1>Real headline</h1>' +
+      '<p>Real paragraph one.</p>' +
+      '<div class="preferred-source">Get IGN Biggest Stories FIRST. Set Us as Your Source. Add Source</div>' +
+      '<div class="ign-recommends"><h3>Recommends</h3><span>Some other article</span></div>' +
+      '<div><h3 data-cy="object-summary-embed-title">In This Article</h3><span>Xbox</span></div>';
+
+    const result = preprocessHtmlForSite(url, html);
+
+    expect(result).not.toContain('Set Us as Your Source');
+    expect(result).not.toContain('Recommends');
+    expect(result).not.toContain('In This Article');
+    expect(result).toContain('Real headline');
+    expect(result).toContain('Real paragraph one.');
+  });
+
+  it('cleans a Readability byline that glued a name to an "Updated:" timestamp with no separator', () => {
+    const article = polishArticleForSite(
+      fakeArticle({ url, byline: 'By Virginia GlazeUpdated: Jul 16, 2026 9:11pm UTC38 comments' }),
+    );
+    expect(article.byline).toBe('By Virginia Glaze');
+  });
+
+  it('leaves an already-clean byline untouched', () => {
+    const article = polishArticleForSite(fakeArticle({ url, byline: 'By Virginia Glaze' }));
+    expect(article.byline).toBe('By Virginia Glaze');
+  });
+
+  it('leaves a null byline untouched', () => {
+    const article = polishArticleForSite(fakeArticle({ url, byline: null }));
+    expect(article.byline).toBeNull();
+  });
+});
+
+describe('polishArticleForSite for insideevs.com', () => {
+  const url = 'https://insideevs.com/news/example-article/';
+
+  it('strips a trailing "Related Articles" paragraph baked into the JSON-LD articleBody text', () => {
+    const html =
+      '<p>Real paragraph one.</p>' +
+      '<p>Contact the author: someone@insideevs.com.</p>' +
+      '<p> Related Articles                      Some Other Headline                      Another Headline</p>';
+
+    const article = polishArticleForSite(fakeArticle({ url, content: html }));
+
+    expect(article.content).not.toContain('Related Articles');
+    expect(article.content).not.toContain('Some Other Headline');
+    expect(article.content).toContain('Real paragraph one.');
+    expect(article.content).toContain('Contact the author');
+  });
+
+  it('leaves content untouched when none of the known junk is present', () => {
+    const article = fakeArticle({ url, content: '<p>Clean paragraph.</p>' });
+    expect(polishArticleForSite(article)).toEqual(article);
+  });
+});

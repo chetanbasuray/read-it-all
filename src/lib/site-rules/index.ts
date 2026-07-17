@@ -18,6 +18,11 @@ import { pravdaRule } from './pravda.com.ua';
 import { dwRule } from './dw.com';
 import { rteRule } from './rte.ie';
 import { arsTechnicaRule } from './arstechnica.com';
+import { eurogamerRule } from './eurogamer.net';
+import { dexertoRule } from './dexerto.com';
+import { cnbcRule } from './cnbc.com';
+import { ignRule } from './ign.com';
+import { insideEvsRule } from './insideevs.com';
 
 const SITE_RULES: Record<string, SiteRule> = {
   'bbc.com': bbcRule,
@@ -41,6 +46,11 @@ const SITE_RULES: Record<string, SiteRule> = {
   'dw.com': dwRule,
   'rte.ie': rteRule,
   'arstechnica.com': arsTechnicaRule,
+  'eurogamer.net': eurogamerRule,
+  'dexerto.com': dexertoRule,
+  'cnbc.com': cnbcRule,
+  'ign.com': ignRule,
+  'insideevs.com': insideEvsRule,
 };
 
 function getSiteRule(url: string): SiteRule | null {

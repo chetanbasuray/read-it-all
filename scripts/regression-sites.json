@@ -94,5 +94,30 @@
     "domain": "arstechnica.com",
     "url": "https://arstechnica.com/gaming/2026/07/hundreds-rally-at-bethesda-hq-to-protest-xbox-layoffs-and-ars-was-there/",
     "status": "known-good"
+  },
+  {
+    "domain": "eurogamer.net",
+    "url": "https://www.eurogamer.net/marvels-wolverine-story-trailer-sony-disc-outrage",
+    "status": "known-good"
+  },
+  {
+    "domain": "dexerto.com",
+    "url": "https://www.dexerto.com/gaming/ex-playstation-boss-explains-why-digital-games-wont-be-cheaper-even-when-discs-end-3387685/",
+    "status": "known-good"
+  },
+  {
+    "domain": "cnbc.com",
+    "url": "https://www.cnbc.com/2026/07/17/moonshot-ai-kimi-k3-model-openai-anthropic-china.html",
+    "status": "known-good"
+  },
+  {
+    "domain": "ign.com",
+    "url": "https://www.ign.com/articles/microsoft-restores-players-25-year-old-account-with-sons-baby-photos-after-nuking-it-due-to-hacker",
+    "status": "known-good"
+  },
+  {
+    "domain": "insideevs.com",
+    "url": "https://insideevs.com/news/801796/dongfeng-canada-china-nammi-box/",
+    "status": "known-good"
   }
 ]

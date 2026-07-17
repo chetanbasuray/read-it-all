@@ -374,8 +374,12 @@ function buildArticleFromMetadata(
   url: string,
 ): ArticleData | null {
   const title = extractTitle(html);
-  const content = $tryExtractContentFromNoscript(html);
-  if (title && content && content.length > 500) {
+  const rawContent = $tryExtractContentFromNoscript(html);
+  if (title && rawContent && rawContent.length > 500) {
+    // <noscript> is opaque raw text to the parser (not real child nodes), so a
+    // page could smuggle live markup (e.g. an onerror handler) straight into
+    // stored content; sanitize here just like the JSON-LD and Readability tiers do
+    const content = sanitizeHtml(rawContent);
     return {
       title,
       content,

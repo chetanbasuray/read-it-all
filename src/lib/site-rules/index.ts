@@ -10,6 +10,14 @@ import { bylineTimesRule } from './bylinetimes.com';
 import { pcmagRule } from './pcmag.com';
 import { dailyMailRule } from './dailymail.co.uk';
 import { vergeRule } from './theverge.com';
+import { hinduRule } from './thehindu.com';
+import { moneycontrolRule } from './moneycontrol.com';
+import { yahooRule } from './yahoo.com';
+import { techSpotRule } from './techspot.com';
+import { pravdaRule } from './pravda.com.ua';
+import { dwRule } from './dw.com';
+import { rteRule } from './rte.ie';
+import { arsTechnicaRule } from './arstechnica.com';
 
 const SITE_RULES: Record<string, SiteRule> = {
   'bbc.com': bbcRule,
@@ -25,6 +33,14 @@ const SITE_RULES: Record<string, SiteRule> = {
   'dailymail.co.uk': dailyMailRule,
   'dailymail.com': dailyMailRule,
   'theverge.com': vergeRule,
+  'thehindu.com': hinduRule,
+  'moneycontrol.com': moneycontrolRule,
+  'yahoo.com': yahooRule,
+  'techspot.com': techSpotRule,
+  'pravda.com.ua': pravdaRule,
+  'dw.com': dwRule,
+  'rte.ie': rteRule,
+  'arstechnica.com': arsTechnicaRule,
 };
 
 function getSiteRule(url: string): SiteRule | null {

@@ -62,7 +62,8 @@
   {
     "domain": "moneycontrol.com",
     "url": "https://www.moneycontrol.com/world/going-to-be-killed-why-world-s-top-ai-executives-are-fearing-for-their-lives-article-13975388.html",
-    "status": "known-good"
+    "status": "known-good",
+    "note": "Confirmed working locally and via this script, but blocked in production, same as the CNN entry below: moneycontrol.com appears to block Vercel's datacenter IP range specifically."
   },
   {
     "domain": "yahoo.com",

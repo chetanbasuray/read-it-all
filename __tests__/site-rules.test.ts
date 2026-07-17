@@ -577,3 +577,173 @@ describe('polishArticleForSite for theverge.com', () => {
     expect(polishArticleForSite(article)).toEqual(article);
   });
 });
+
+describe('preprocessHtmlForSite for thehindu.com', () => {
+  const url = 'https://www.thehindu.com/news/national/example/article1.ece';
+
+  it('strips the site-wide login/subscription slide-out', () => {
+    const html =
+      '<div class="comments-chat-side-menu"><p class="status">You are logged in</p>' +
+      '<p>You don\'t have any Active Subscription.</p></div>' +
+      '<p>Real paragraph one.</p>';
+
+    const result = preprocessHtmlForSite(url, html);
+
+    expect(result).not.toContain('You are logged in');
+    expect(result).not.toContain('Active Subscription');
+    expect(result).toContain('Real paragraph one.');
+  });
+
+  it('leaves content untouched when the widget is absent', () => {
+    const html = '<p>Clean paragraph.</p>';
+    expect(preprocessHtmlForSite(url, html)).toContain('Clean paragraph.');
+  });
+});
+
+describe('preprocessHtmlForSite for moneycontrol.com', () => {
+  const url = 'https://www.moneycontrol.com/world/example-article-1.html';
+
+  it('strips the global header and its hidden mega-menus', () => {
+    const html =
+      '<header id="common_header"><div class="mega_menu investNW">' +
+      '<span class="tit-txt1">Invest in Top Unlisted</span>' +
+      '<p class="tit-txt2">Discover the secret world of unlisted shares</p></div></header>' +
+      '<div id="article-1"><p>Real paragraph one.</p></div>';
+
+    const result = preprocessHtmlForSite(url, html);
+
+    expect(result).not.toContain('Invest in Top Unlisted');
+    expect(result).not.toContain('Discover the secret world');
+    expect(result).toContain('Real paragraph one.');
+  });
+});
+
+describe('preprocessHtmlForSite for yahoo.com', () => {
+  const url = 'https://www.yahoo.com/news/world/articles/example-1.html';
+
+  it('strips the follow button and "Add Yahoo as a preferred source" widgets', () => {
+    const html =
+      '<button data-ylk="elm:intent-follow;slk:Follow;" disabled><span>Follow</span></button>' +
+      '<a aria-label="Add Yahoo on Google" href="https://www.google.com/preferences/source?q=yahoo.com">Add</a>' +
+      '<div role="tooltip">Add Yahoo as a preferred source to see more of our stories on Google.</div>' +
+      '<p>Real paragraph one.</p>';
+
+    const result = preprocessHtmlForSite(url, html);
+
+    expect(result).not.toContain('preferred source');
+    expect(result).not.toContain('Add Yahoo on Google');
+    expect(result).toContain('Real paragraph one.');
+  });
+});
+
+describe('preprocessHtmlForSite for techspot.com', () => {
+  const url = 'https://www.techspot.com/news/example-1.html';
+
+  it('strips the category-tag breadcrumb and the trust tagline', () => {
+    const html =
+      '<ul class="category-chicklets"><li class="ai"><a href="/category/ai/">AI</a></li></ul>' +
+      '<div class="trust-feat news">Serving tech enthusiasts for over 25 years.</div>' +
+      '<div class="articleBody"><p>Real paragraph one.</p></div>';
+
+    const result = preprocessHtmlForSite(url, html);
+
+    expect(result).not.toContain('category-chicklets');
+    expect(result).not.toContain('Serving tech enthusiasts');
+    expect(result).toContain('Real paragraph one.');
+  });
+});
+
+describe('preprocessHtmlForSite for pravda.com.ua', () => {
+  const url = 'https://www.pravda.com.ua/eng/news/2026/07/16/example/';
+
+  it('strips the share widget, mid-article ads, and the related-news aside', () => {
+    const html =
+      '<article class="post_news"><div class="post_news_body">' +
+      '<aside class="post_news_service"><div class="tooltip">Посилання скопійовано</div></aside>' +
+      '<div class="post_news_text"><p>Real paragraph one.</p>' +
+      '<div class="advtext_mob">Advertisement:</div>' +
+      '<p>Real paragraph two.</p></div>' +
+      '<div class="unit_side_banner"><div class="nts-ad"></div></div></div>' +
+      '<aside class="section_other_news"><div class="section_title">Top news of today</div></aside>' +
+      '</article>';
+
+    const result = preprocessHtmlForSite(url, html);
+
+    expect(result).not.toContain('Посилання скопійовано');
+    expect(result).not.toContain('Advertisement:');
+    expect(result).not.toContain('Top news of today');
+    expect(result).toContain('Real paragraph one.');
+    expect(result).toContain('Real paragraph two.');
+  });
+});
+
+describe('preprocessHtmlForSite for dw.com', () => {
+  const url = 'https://www.dw.com/de/example/a-1';
+
+  it('strips the category kicker, the duplicate numeric date, and the feedback CTA', () => {
+    const html =
+      '<header><div data-tracking-name="content-detail-kicker"><span>Politik</span><span>Deutschland</span></div>' +
+      '<h1>Real headline</h1></header>' +
+      '<span class="publication"><time aria-hidden="true">15.07.2026</time><span>15. Juli 2026</span></span>' +
+      '<p>Real paragraph one.</p>' +
+      '<footer class="c1jc41xr"><div class="feedback"><div role="button" data-tracking-name="feedback-button">Schicken Sie uns Ihr Feedback!</div></div></footer>';
+
+    const result = preprocessHtmlForSite(url, html);
+
+    expect(result).not.toContain('content-detail-kicker');
+    expect(result).not.toContain('15.07.2026');
+    expect(result).toContain('15. Juli 2026');
+    expect(result).not.toContain('Schicken Sie uns');
+    expect(result).toContain('Real headline');
+    expect(result).toContain('Real paragraph one.');
+  });
+});
+
+describe('polishArticleForSite for rte.ie', () => {
+  const url = 'https://www.rte.ie/news/ireland/2026/0716/example/';
+
+  it('strips the "more stories on" footer and the sidebar', () => {
+    const html =
+      '<p>Real paragraph one.</p>' +
+      '<div><h4>More stories on</h4></div>' +
+      '<aside id="sidebar_outer"><div class="ajaxed-content">Most Read</div></aside>';
+
+    const article = polishArticleForSite(fakeArticle({ url, content: html }));
+
+    expect(article.content).not.toContain('More stories on');
+    expect(article.content).not.toContain('Most Read');
+    expect(article.content).toContain('Real paragraph one.');
+  });
+
+  it('leaves content untouched when none of the known junk is present', () => {
+    const article = fakeArticle({ url, content: '<p>Clean paragraph.</p>' });
+    expect(polishArticleForSite(article)).toEqual(article);
+  });
+});
+
+describe('polishArticleForSite for arstechnica.com', () => {
+  const url = 'https://arstechnica.com/gaming/2026/07/example/';
+
+  it('strips a PhotoSwipe gallery caption (a <p> with exactly two bare <span> children)', () => {
+    const html =
+      '<p><span>It\'s true: No devs would mean no games.</span><span>Kyle Orland</span></p>' +
+      '<p>Real paragraph one.</p>';
+
+    const article = polishArticleForSite(fakeArticle({ url, content: html }));
+
+    expect(article.content).not.toContain('No devs would mean no games');
+    expect(article.content).toContain('Real paragraph one.');
+  });
+
+  it('leaves a normal paragraph with a single span untouched', () => {
+    const html = '<p>Real paragraph with <span>an inline span</span> in it.</p>';
+    const article = polishArticleForSite(fakeArticle({ url, content: html }));
+    expect(article.content).toContain('Real paragraph with');
+    expect(article.content).toContain('an inline span');
+  });
+
+  it('leaves content untouched when none of the known junk is present', () => {
+    const article = fakeArticle({ url, content: '<p>Clean paragraph.</p>' });
+    expect(polishArticleForSite(article)).toEqual(article);
+  });
+});

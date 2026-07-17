@@ -45,6 +45,10 @@ export class TakedownError extends Error {
   }
 }
 
+// bare "Cloudflare" is deliberately excluded: countless legitimate sites
+// serve it as a CDN (e.g. via Rocket Loader) with no challenge page at all,
+// so it was a false-positive block on any of them; the patterns below are
+// specific enough to genuine challenge/interstitial pages on their own
 const BOT_CHALLENGE_PATTERNS = [
   'captcha-delivery.com',
   'Please enable JS',
@@ -56,7 +60,6 @@ const BOT_CHALLENGE_PATTERNS = [
   'Just a moment',
   'just a quick check',
   'attention required',
-  'Cloudflare',
   'Access denied',
   'Enable JavaScript',
 ];
@@ -88,6 +91,18 @@ export function isPaywallBoilerplate(article: Pick<ArticleData, 'content' | 'tex
   return PAYWALL_BOILERPLATE_PATTERNS.some((p) => p.test(article.textContent));
 }
 
+// some publishers (e.g. moneycontrol.com) emit JSON-LD with a literal
+// newline/tab inside a string value instead of an escaped \n, which is
+// invalid JSON; those control characters are only ever significant inside
+// string literals, so collapsing them everywhere is a safe recovery parse
+function parseJsonLd(raw: string): any {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return JSON.parse(raw.replace(/[\r\n\t]+/g, ' '));
+  }
+}
+
 export function extractFromJsonLd(
   html: string,
 ): Pick<ArticleData, 'title' | 'content' | 'textContent' | 'byline' | 'image'> | null {
@@ -97,8 +112,10 @@ export function extractFromJsonLd(
   for (const el of scripts) {
     try {
       const raw = $(el).text();
-      const data = JSON.parse(raw);
-      const items = data['@graph'] || [data];
+      const data = parseJsonLd(raw);
+      // some publishers emit a bare top-level array instead of wrapping
+      // multiple entries in @graph
+      const items = Array.isArray(data) ? data : data['@graph'] || [data];
 
       for (const item of items) {
         if (

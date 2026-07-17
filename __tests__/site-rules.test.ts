@@ -123,7 +123,9 @@ describe('extractArticle with BBC nav-menu regression', () => {
 
   it('reproduces the bug when the site rule is bypassed (sanity check)', () => {
     // same fixture, but hitting a domain with no registered rule, so the noscript
-    // nav is left in place: proves the fixture actually exercises the real failure mode
+    // nav is left in place: proves the fixture actually exercises the real failure
+    // mode. Checked by leaked link text rather than the NoJsNavigation class name,
+    // since sanitizeHtml strips <details> (not an allowed tag) along with its class
     const html = withNoJsNav(
       '<article><h1>Real Headline</h1><p>' +
         'This is the real article body with enough substance to be extracted correctly. '.repeat(10) +
@@ -133,7 +135,23 @@ describe('extractArticle with BBC nav-menu regression', () => {
     const article = extractArticle(html, 'https://example.com/articles/c123');
 
     expect(article).not.toBeNull();
-    expect(article?.content).toContain('NoJsNavigation');
+    expect(article?.content).toContain('Section 0');
+  });
+});
+
+describe('extractArticle noscript-metadata tier sanitizes its output', () => {
+  it('strips a live event-handler attribute smuggled in via <noscript> raw text', () => {
+    const filler = 'Real paragraph text with enough substance to pass the length threshold. '.repeat(10);
+    const html =
+      '<html><head><title>Real Headline</title></head><body>' +
+      `<noscript><p>${filler}</p><img src="x" onerror="alert(1)"></noscript>` +
+      '</body></html>';
+
+    const article = extractArticle(html, 'https://example.com/article');
+
+    expect(article).not.toBeNull();
+    expect(article?.content).not.toContain('onerror');
+    expect(article?.textContent).toContain('Real paragraph text');
   });
 });
 

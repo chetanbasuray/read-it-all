@@ -119,5 +119,60 @@
     "domain": "insideevs.com",
     "url": "https://insideevs.com/news/801796/dongfeng-canada-china-nammi-box/",
     "status": "known-good"
+  },
+  {
+    "domain": "i24news.tv",
+    "url": "https://www.i24news.tv/en/news/fifa-world-cup-2026/artc-netanyahu-on-the-2026-world-cup-i-support-argentina-milei-is-a-great-friend-of-israel",
+    "status": "known-good"
+  },
+  {
+    "domain": "fortune.com",
+    "url": "https://fortune.com/2026/07/17/china-moonshot-kimi-k3-markets-china-ai/",
+    "status": "known-good"
+  },
+  {
+    "domain": "kyivpost.com",
+    "url": "https://www.kyivpost.com/post/80572",
+    "status": "known-good"
+  },
+  {
+    "domain": "heise.de",
+    "url": "https://www.heise.de/en/news/US-CD-sales-rise-despite-many-buyers-lacking-CD-players-11368976.html",
+    "status": "known-good"
+  },
+  {
+    "domain": "spiegel.de",
+    "url": "https://www.spiegel.de/politik/deutschland/jens-spahn-cdu-mecklenburg-vorpommern-fordert-nach-umstrittener-leihmutterschaft-ruecktritt-a-196f46c7-a54a-4408-ab0f-dc1440b5a730",
+    "status": "known-good"
+  },
+  {
+    "domain": "mashable.com",
+    "url": "https://mashable.com/tech/we-must-act-now-economists-issue-ai-job-loss-warning",
+    "status": "known-good"
+  },
+  {
+    "domain": "indianexpress.com",
+    "url": "https://indianexpress.com/article/cities/delhi/sonam-wangchuk-jantar-mantar-police-operation-cjp-protest-hunger-strike-abhijeet-dipke-cockroach-janta-party-10792180/",
+    "status": "known-good"
+  },
+  {
+    "domain": "thenationaldesk.com",
+    "url": "https://thenationaldesk.com/news/americas-news-now/plane-passenger-invoked-sharia-law-to-not-sit-next-to-woman-hit-stewardess-german-police-turkey-flight-dusseldorf-islam",
+    "status": "known-good"
+  },
+  {
+    "domain": "newindianexpress.com",
+    "url": "https://www.newindianexpress.com/india/2026/Jul/16/indias-textile-industry-losing-export-potential-to-inefficiency-weak-value-addition-report",
+    "status": "known-good"
+  },
+  {
+    "domain": "news18.com",
+    "url": "https://www.news18.com/world/balochistan-declares-independence-from-pakistan-why-it-matters-more-to-islamabad-than-pok-10221602.html",
+    "status": "known-good"
+  },
+  {
+    "domain": "hartpunkt.de",
+    "url": "https://www.hartpunkt.de/alternative-zu-patriot-macron-bietet-deutschland-koproduktion-beim-luftverteidigungssystem-samp-t-ng-an/",
+    "status": "known-good"
   }
 ]

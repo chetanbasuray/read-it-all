@@ -708,6 +708,12 @@ describe('isPaywallBoilerplate', () => {
     expect(isPaywallBoilerplate({ content: `<p>${textContent}</p>`, textContent })).toBe(true);
   });
 
+  it('flags Times-style "thank you for reading" subscription modal copy', () => {
+    const textContent =
+      'Thank you for reading The Times and Sunday Times Enjoy unlimited digital access. £1 for 6 months. Subscribe now Already a subscriber? Sign In';
+    expect(isPaywallBoilerplate({ content: `<p>${textContent}</p>`, textContent })).toBe(true);
+  });
+
   it('does not flag a real article', () => {
     const textContent =
       'Taslima Nasreen\'s planned return to Kolkata after nearly two decades has triggered a political face-off in West Bengal.';

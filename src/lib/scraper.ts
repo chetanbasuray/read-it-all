@@ -85,6 +85,7 @@ const PAYWALL_BOILERPLATE_PATTERNS = [
   /register to unlock this article/i,
   /to read this article for free,?\s*register/i,
   /continue reading (your|this) article with an?\s*\S+\s*subscription/i,
+  /thank you for reading[\s\S]{0,120}(subscribe now|unlimited digital access)/i,
 ];
 
 export function isPaywallBoilerplate(article: Pick<ArticleData, 'content' | 'textContent'>): boolean {
@@ -197,6 +198,15 @@ export function extractAuthor(html: string): string | null {
   return null;
 }
 
+function isConsentGatewayUrl(url: string): boolean {
+  try {
+    const { hostname, pathname } = new URL(url);
+    return hostname.startsWith('consent.') || pathname.includes('/collectConsent');
+  } catch {
+    return false;
+  }
+}
+
 async function fetchWithUA(
   url: string,
   ua: string,
@@ -224,6 +234,13 @@ async function fetchWithUA(
 
     if (!response.ok) {
       return { html: null, status: response.status, blocked: false };
+    }
+
+    // a redirect chain can land on a GDPR consent gateway (e.g. Yahoo's
+    // consent.yahoo.com) instead of the article; that page would otherwise
+    // pass every other check and get cached as if it were the real content
+    if (isConsentGatewayUrl(response.url)) {
+      return { html: null, status: response.status, blocked: true };
     }
 
     const html = await response.text();
@@ -382,6 +399,17 @@ export function parseWithReadability(html: string, url: string): ArticleData | n
   return null;
 }
 
+// a <noscript> block long enough to pass the metadata tier's length check can
+// still be CSS/attribute soup rather than prose (a lazy-load plugin's <style>
+// tag, or a lazy-loaded <img>'s long src/srcset with no spaces); real article
+// text is overwhelmingly plain words, so reject text that isn't
+function looksLikeProse(text: string): boolean {
+  const words = text.trim().split(/\s+/);
+  if (words.length < 20) return false;
+  const wordLike = words.filter((w) => /^[A-Za-z][A-Za-z'’-]*[.,;:!?]?$/.test(w));
+  return wordLike.length / words.length > 0.6;
+}
+
 function buildArticleFromMetadata(
   html: string,
   url: string,
@@ -393,6 +421,8 @@ function buildArticleFromMetadata(
     // page could smuggle live markup (e.g. an onerror handler) straight into
     // stored content; sanitize here just like the JSON-LD and Readability tiers do
     const content = sanitizeHtml(rawContent);
+    const plainText = content.replace(/<[^>]*>/g, '').trim();
+    if (plainText.length < 200 || !looksLikeProse(plainText)) return null;
     return {
       title,
       content,

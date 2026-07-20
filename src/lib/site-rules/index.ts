@@ -23,6 +23,17 @@ import { dexertoRule } from './dexerto.com';
 import { cnbcRule } from './cnbc.com';
 import { ignRule } from './ign.com';
 import { insideEvsRule } from './insideevs.com';
+import { i24NewsRule } from './i24news.tv';
+import { fortuneRule } from './fortune.com';
+import { kyivPostRule } from './kyivpost.com';
+import { heiseRule } from './heise.de';
+import { spiegelRule } from './spiegel.de';
+import { mashableRule } from './mashable.com';
+import { indianExpressRule } from './indianexpress.com';
+import { nationalDeskRule } from './thenationaldesk.com';
+import { newIndianExpressRule } from './newindianexpress.com';
+import { news18Rule } from './news18.com';
+import { hartpunktRule } from './hartpunkt.de';
 
 const SITE_RULES: Record<string, SiteRule> = {
   'bbc.com': bbcRule,
@@ -51,6 +62,17 @@ const SITE_RULES: Record<string, SiteRule> = {
   'cnbc.com': cnbcRule,
   'ign.com': ignRule,
   'insideevs.com': insideEvsRule,
+  'i24news.tv': i24NewsRule,
+  'fortune.com': fortuneRule,
+  'kyivpost.com': kyivPostRule,
+  'heise.de': heiseRule,
+  'spiegel.de': spiegelRule,
+  'mashable.com': mashableRule,
+  'indianexpress.com': indianExpressRule,
+  'thenationaldesk.com': nationalDeskRule,
+  'newindianexpress.com': newIndianExpressRule,
+  'news18.com': news18Rule,
+  'hartpunkt.de': hartpunktRule,
 };
 
 function getSiteRule(url: string): SiteRule | null {

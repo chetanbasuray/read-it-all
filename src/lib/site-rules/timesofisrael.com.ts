@@ -20,8 +20,7 @@ function preprocessToiIsraelHtml(html: string): string {
   const $ = cheerio.load(html);
   fixBylineWrapper($);
   stripNewsletterWidget($);
-  // content is a fragment, not a document: $.html() would wrap it in <html><body>
-  return $('body').html() ?? html;
+  return $.html();
 }
 
 // the byline text itself starts with "By " (e.g. "By ToI Staff"), but the

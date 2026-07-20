@@ -13,7 +13,7 @@ function stripWidgets($: cheerio.CheerioAPI): void {
 function preprocessHinduHtml(html: string): string {
   const $ = cheerio.load(html);
   stripWidgets($);
-  return $('body').html() ?? html;
+  return $.html();
 }
 
 export const hinduRule: SiteRule = {

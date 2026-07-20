@@ -15,7 +15,7 @@ function stripWidgets($: cheerio.CheerioAPI): void {
 function preprocessNationalDeskHtml(html: string): string {
   const $ = cheerio.load(html);
   stripWidgets($);
-  return $('body').html() ?? html;
+  return $.html();
 }
 
 // Readability's byline glues the outlet name straight to the publish

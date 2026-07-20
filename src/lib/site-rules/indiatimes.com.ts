@@ -34,8 +34,7 @@ function preprocessToiHtml(html: string): string {
   restoreParagraphBreaks($);
   stripAppPromo($);
   stripEmbeddedWidgets($);
-  // content is a fragment, not a document: $.html() would wrap it in <html><body>
-  return $('body').html() ?? html;
+  return $.html();
 }
 
 // with JSON-LD removed, byline falls back to the page's byline div, which

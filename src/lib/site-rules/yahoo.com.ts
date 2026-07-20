@@ -15,7 +15,7 @@ function stripWidgets($: cheerio.CheerioAPI): void {
 function preprocessYahooHtml(html: string): string {
   const $ = cheerio.load(html);
   stripWidgets($);
-  return $('body').html() ?? html;
+  return $.html();
 }
 
 export const yahooRule: SiteRule = {

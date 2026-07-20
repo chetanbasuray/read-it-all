@@ -17,7 +17,7 @@ function stripWidgets($: cheerio.CheerioAPI): void {
 function preprocessSpiegelHtml(html: string): string {
   const $ = cheerio.load(html);
   stripWidgets($);
-  return $('body').html() ?? html;
+  return $.html();
 }
 
 export const spiegelRule: SiteRule = {

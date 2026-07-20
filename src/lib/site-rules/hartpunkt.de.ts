@@ -17,7 +17,7 @@ function stripAds($: cheerio.CheerioAPI): void {
 function preprocessHartpunktHtml(html: string): string {
   const $ = cheerio.load(html);
   stripAds($);
-  return $('body').html() ?? html;
+  return $.html();
 }
 
 export const hartpunktRule: SiteRule = {

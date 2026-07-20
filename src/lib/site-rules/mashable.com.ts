@@ -12,7 +12,7 @@ function stripBreadcrumb($: cheerio.CheerioAPI): void {
 function preprocessMashableHtml(html: string): string {
   const $ = cheerio.load(html);
   stripBreadcrumb($);
-  return $('body').html() ?? html;
+  return $.html();
 }
 
 export const mashableRule: SiteRule = {

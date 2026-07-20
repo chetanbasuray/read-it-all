@@ -22,8 +22,7 @@ function preprocessPcmagHtml(html: string): string {
   const $ = cheerio.load(html);
   markByline($);
   stripWidgets($);
-  // content is a fragment, not a document: $.html() would wrap it in <html><body>
-  return $('body').html() ?? html;
+  return $.html();
 }
 
 export const pcmagRule: SiteRule = {

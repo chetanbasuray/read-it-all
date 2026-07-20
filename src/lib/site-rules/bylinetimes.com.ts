@@ -24,8 +24,7 @@ function preprocessBylineTimesHtml(html: string): string {
   const $ = cheerio.load(html);
   stripNoscriptImageFallback($);
   stripSubscribePromo($);
-  // content is a fragment, not a document: $.html() would wrap it in <html><body>
-  return $('body').html() ?? html;
+  return $.html();
 }
 
 export const bylineTimesRule: SiteRule = {

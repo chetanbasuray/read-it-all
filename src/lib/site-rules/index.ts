@@ -35,7 +35,7 @@ import { newIndianExpressRule } from './newindianexpress.com';
 import { news18Rule } from './news18.com';
 import { hartpunktRule } from './hartpunkt.de';
 
-const SITE_RULES: Record<string, SiteRule> = {
+export const SITE_RULES: Record<string, SiteRule> = {
   'bbc.com': bbcRule,
   'bbc.co.uk': bbcRule,
   'reuters.com': reutersRule,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { preprocessHtmlForSite, polishArticleForSite } from '@/lib/site-rules';
+import { preprocessHtmlForSite, polishArticleForSite, SITE_RULES } from '@/lib/site-rules';
 import { extractArticle, type ArticleData } from '@/lib/scraper';
 
 function fakeArticle(overrides: Partial<ArticleData> = {}): ArticleData {
@@ -30,6 +30,23 @@ function withNoJsNav(bodyHtml: string): string {
     `</body></html>`
   );
 }
+
+describe('every registered preprocessHtml rule preserves <head>', () => {
+  // a rule that serializes via $('body').html() instead of $.html() silently
+  // discards <head>, breaking og:image/twitter:image/JSON-LD/meta-author
+  // extraction downstream; this bug hit 20 site rules at once (found via
+  // news18.com's hero image resolving to an unrelated font-preview SVG)
+  const headMarker = '<meta property="og:image" content="https://example.com/real-photo.jpg">';
+  const rawHtml = `<html><head>${headMarker}</head><body><article><p>Real paragraph.</p></article></body></html>`;
+
+  for (const [domain, rule] of Object.entries(SITE_RULES)) {
+    if (!rule.preprocessHtml) continue;
+    it(`keeps the og:image meta tag intact for ${domain}`, () => {
+      const result = rule.preprocessHtml!(rawHtml);
+      expect(result).toContain(headMarker);
+    });
+  }
+});
 
 describe('preprocessHtmlForSite', () => {
   it('strips the noscript-wrapped NoJsNavigation block for bbc.com URLs', () => {

@@ -27,7 +27,7 @@ function preprocessDwHtml(html: string): string {
   stripKicker($);
   dedupePublishDate($);
   stripFeedbackWidget($);
-  return $('body').html() ?? html;
+  return $.html();
 }
 
 export const dwRule: SiteRule = {

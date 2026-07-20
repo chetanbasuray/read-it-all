@@ -11,7 +11,7 @@ function stripWidgets($: cheerio.CheerioAPI): void {
 function preprocessI24NewsHtml(html: string): string {
   const $ = cheerio.load(html);
   stripWidgets($);
-  return $('body').html() ?? html;
+  return $.html();
 }
 
 export const i24NewsRule: SiteRule = {

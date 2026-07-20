@@ -11,7 +11,7 @@ function stripHeader($: cheerio.CheerioAPI): void {
 function preprocessMoneycontrolHtml(html: string): string {
   const $ = cheerio.load(html);
   stripHeader($);
-  return $('body').html() ?? html;
+  return $.html();
 }
 
 export const moneycontrolRule: SiteRule = {

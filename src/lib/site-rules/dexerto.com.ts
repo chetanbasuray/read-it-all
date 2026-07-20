@@ -23,7 +23,7 @@ function preprocessDexertoHtml(html: string): string {
   const $ = cheerio.load(html);
   stripTrendingRail($);
   stripAsides($);
-  return $('body').html() ?? html;
+  return $.html();
 }
 
 export const dexertoRule: SiteRule = {

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { cache } from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Reader } from '@/components/Reader';
@@ -6,12 +7,16 @@ import { getArticleById, getArticleViews, getUrlForId } from '@/lib/redis';
 
 export const dynamic = 'force-dynamic';
 
+// generateMetadata and the page component below both need the same article;
+// cache() dedupes the two calls into a single Redis read per request
+const getArticle = cache(getArticleById);
+
 export async function generateMetadata({
   params,
 }: {
   params: { id: string };
 }): Promise<Metadata> {
-  const article = await getArticleById(params.id);
+  const article = await getArticle(params.id);
   if (!article) {
     return { title: 'Article not found - Read It All' };
   }
@@ -42,7 +47,7 @@ export default async function ReaderPage({
 }: {
   params: { id: string };
 }) {
-  const article = await getArticleById(params.id);
+  const article = await getArticle(params.id);
 
   if (!article) {
     const url = await getUrlForId(params.id);

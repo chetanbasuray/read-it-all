@@ -108,7 +108,8 @@
   {
     "domain": "cnbc.com",
     "url": "https://www.cnbc.com/2026/07/17/moonshot-ai-kimi-k3-model-openai-anthropic-china.html",
-    "status": "known-good"
+    "status": "known-good",
+    "note": "Confirmed working locally and via this script, but blocked in production as of 2026-07-22, same as the CNN entry above: cnbc.com appears to block Vercel's datacenter IP range specifically."
   },
   {
     "domain": "ign.com",

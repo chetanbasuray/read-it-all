@@ -548,42 +548,35 @@ describe('preprocessHtmlForSite for pcmag.com', () => {
   });
 });
 
-describe('polishArticleForSite for dailymail.co.uk', () => {
-  it('strips the Published/Updated timestamp paragraph and the Google-preferred-source bullet', () => {
+describe('preprocessHtmlForSite for dailymail.co.uk', () => {
+  it('strips the byline-section timestamp block and the Google-preferred-source bullet', () => {
     const html =
       '<p>Real paragraph one.</p>' +
-      '<p><span>Published: 22:37 BST, 15 July 2026</span> | <span>Updated: 22:51 BST, 15 July 2026</span></p>' +
+      '<p class="byline-section"><span>Published: 22:37 BST, 15 July 2026</span> | <span>Updated: 22:51 BST, 15 July 2026</span></p>' +
       '<ul><li><strong>See more Daily Mail on Google - <a href="#">save us as a Preferred Source</a></strong></li></ul>' +
       '<p>Real paragraph two.</p>';
 
-    const article = polishArticleForSite(
-      fakeArticle({ url: 'https://www.dailymail.co.uk/news/article-1/example.html', content: html }),
-    );
+    const result = preprocessHtmlForSite('https://www.dailymail.co.uk/news/article-1/example.html', html);
 
-    expect(article.content).not.toContain('Published:');
-    expect(article.content).not.toContain('Preferred Source');
-    expect(article.content).toContain('Real paragraph one.');
-    expect(article.content).toContain('Real paragraph two.');
+    expect(result).not.toContain('Published:');
+    expect(result).not.toContain('Preferred Source');
+    expect(result).toContain('Real paragraph one.');
+    expect(result).toContain('Real paragraph two.');
   });
 
   it('applies the same rule to dailymail.com and dailymail.co.uk', () => {
-    const html = '<p>Published: today</p><p>Real.</p>';
-    const comArticle = polishArticleForSite(
-      fakeArticle({ url: 'https://www.dailymail.com/news/article-1/example.html', content: html }),
-    );
-    const coUkArticle = polishArticleForSite(
-      fakeArticle({ url: 'https://www.dailymail.co.uk/news/article-1/example.html', content: html }),
-    );
-    expect(comArticle.content).not.toContain('Published:');
-    expect(coUkArticle.content).not.toContain('Published:');
+    const html = '<p class="byline-section">Published: today</p><p>Real.</p>';
+    const comResult = preprocessHtmlForSite('https://www.dailymail.com/news/article-1/example.html', html);
+    const coUkResult = preprocessHtmlForSite('https://www.dailymail.co.uk/news/article-1/example.html', html);
+    expect(comResult).not.toContain('Published:');
+    expect(coUkResult).not.toContain('Published:');
   });
 
   it('leaves content untouched when none of the known junk is present', () => {
-    const article = fakeArticle({
-      url: 'https://www.dailymail.co.uk/news/article-1/example.html',
-      content: '<p>Clean paragraph.</p>',
-    });
-    expect(polishArticleForSite(article)).toEqual(article);
+    const html = '<p>Clean paragraph.</p>';
+    expect(preprocessHtmlForSite('https://www.dailymail.co.uk/news/article-1/example.html', html)).toContain(
+      'Clean paragraph.',
+    );
   });
 });
 
@@ -764,52 +757,48 @@ describe('preprocessHtmlForSite for dw.com', () => {
   });
 });
 
-describe('polishArticleForSite for rte.ie', () => {
+describe('preprocessHtmlForSite for rte.ie', () => {
   const url = 'https://www.rte.ie/news/ireland/2026/0716/example/';
 
-  it('strips the "more stories on" footer and the sidebar', () => {
+  it('strips the "more stories on" tags footer and the sidebar', () => {
     const html =
       '<p>Real paragraph one.</p>' +
-      '<div><h4>More stories on</h4></div>' +
+      '<div class="tags-container"><h4>More stories on</h4></div>' +
       '<aside id="sidebar_outer"><div class="ajaxed-content">Most Read</div></aside>';
 
-    const article = polishArticleForSite(fakeArticle({ url, content: html }));
+    const result = preprocessHtmlForSite(url, html);
 
-    expect(article.content).not.toContain('More stories on');
-    expect(article.content).not.toContain('Most Read');
-    expect(article.content).toContain('Real paragraph one.');
+    expect(result).not.toContain('More stories on');
+    expect(result).not.toContain('Most Read');
+    expect(result).toContain('Real paragraph one.');
   });
 
   it('leaves content untouched when none of the known junk is present', () => {
-    const article = fakeArticle({ url, content: '<p>Clean paragraph.</p>' });
-    expect(polishArticleForSite(article)).toEqual(article);
+    const html = '<p>Clean paragraph.</p>';
+    expect(preprocessHtmlForSite(url, html)).toContain('Clean paragraph.');
   });
 });
 
-describe('polishArticleForSite for arstechnica.com', () => {
+describe('preprocessHtmlForSite for arstechnica.com', () => {
   const url = 'https://arstechnica.com/gaming/2026/07/example/';
 
-  it('strips a PhotoSwipe gallery caption (a <p> with exactly two bare <span> children)', () => {
+  it('strips PhotoSwipe gallery captions (the hidden lightbox one and the visible inline one)', () => {
     const html =
-      '<p><span>It\'s true: No devs would mean no games.</span><span>Kyle Orland</span></p>' +
-      '<p>Real paragraph one.</p>';
+      '<p>Real paragraph one.</p>' +
+      '<div class="pswp-caption-content" id="caption-1">Hidden lightbox caption<div class="ars-gallery-caption-credit">Kyle Orland</div></div>' +
+      '<div class="ars-gallery-caption-content"><span class="ars-gallery-caption-text">It\'s true: No devs would mean no games.</span>' +
+      '<span class="ars-gallery-caption-credit">Kyle Orland</span></div>';
 
-    const article = polishArticleForSite(fakeArticle({ url, content: html }));
+    const result = preprocessHtmlForSite(url, html);
 
-    expect(article.content).not.toContain('No devs would mean no games');
-    expect(article.content).toContain('Real paragraph one.');
-  });
-
-  it('leaves a normal paragraph with a single span untouched', () => {
-    const html = '<p>Real paragraph with <span>an inline span</span> in it.</p>';
-    const article = polishArticleForSite(fakeArticle({ url, content: html }));
-    expect(article.content).toContain('Real paragraph with');
-    expect(article.content).toContain('an inline span');
+    expect(result).not.toContain('No devs would mean no games');
+    expect(result).not.toContain('Hidden lightbox caption');
+    expect(result).toContain('Real paragraph one.');
   });
 
   it('leaves content untouched when none of the known junk is present', () => {
-    const article = fakeArticle({ url, content: '<p>Clean paragraph.</p>' });
-    expect(polishArticleForSite(article)).toEqual(article);
+    const html = '<p>Clean paragraph.</p>';
+    expect(preprocessHtmlForSite(url, html)).toContain('Clean paragraph.');
   });
 });
 
@@ -857,7 +846,7 @@ describe('preprocessHtmlForSite for dexerto.com', () => {
   });
 });
 
-describe('polishArticleForSite for cnbc.com', () => {
+describe('preprocessHtmlForSite for cnbc.com', () => {
   const url = 'https://www.cnbc.com/2026/07/17/example-article.html';
 
   it('strips the article header, the Google-preferred-source CTA, and the watch-live rail', () => {
@@ -867,17 +856,17 @@ describe('polishArticleForSite for cnbc.com', () => {
       '<div data-module="GooglePreferredSource">Choose CNBC as your preferred source on Google.</div>' +
       '<div id="RegularArticle-WatchLiveRightRail-8"><a href="/live-tv/">WATCH LIVESTREAM</a></div>';
 
-    const article = polishArticleForSite(fakeArticle({ url, content: html }));
+    const result = preprocessHtmlForSite(url, html);
 
-    expect(article.content).not.toContain('WATCH LIVE');
-    expect(article.content).not.toContain('preferred source on Google');
-    expect(article.content).not.toContain('WATCH LIVESTREAM');
-    expect(article.content).toContain('Real paragraph one.');
+    expect(result).not.toContain('WATCH LIVE');
+    expect(result).not.toContain('preferred source on Google');
+    expect(result).not.toContain('WATCH LIVESTREAM');
+    expect(result).toContain('Real paragraph one.');
   });
 
   it('leaves content untouched when none of the known junk is present', () => {
-    const article = fakeArticle({ url, content: '<p>Clean paragraph.</p>' });
-    expect(polishArticleForSite(article)).toEqual(article);
+    const html = '<p>Clean paragraph.</p>';
+    expect(preprocessHtmlForSite(url, html)).toContain('Clean paragraph.');
   });
 });
 
@@ -966,7 +955,7 @@ describe('preprocessHtmlForSite for i24news.tv', () => {
   });
 });
 
-describe('polishArticleForSite for fortune.com', () => {
+describe('preprocessHtmlForSite for fortune.com', () => {
   const url = 'https://fortune.com/2026/07/17/example-article/';
 
   it('strips the subscriptionPlea widget by its data-cy test id', () => {
@@ -975,16 +964,16 @@ describe('polishArticleForSite for fortune.com', () => {
       '<div data-cy="subscriptionPlea"><h3>Sign up for the CEO Daily newsletter</h3></div>' +
       '<p>Real paragraph two.</p>';
 
-    const article = polishArticleForSite(fakeArticle({ url, content: html }));
+    const result = preprocessHtmlForSite(url, html);
 
-    expect(article.content).not.toContain('CEO Daily newsletter');
-    expect(article.content).toContain('Real paragraph one.');
-    expect(article.content).toContain('Real paragraph two.');
+    expect(result).not.toContain('CEO Daily newsletter');
+    expect(result).toContain('Real paragraph one.');
+    expect(result).toContain('Real paragraph two.');
   });
 
   it('leaves content untouched when no subscription widget is present', () => {
-    const article = fakeArticle({ url, content: '<p>Clean paragraph.</p>' });
-    expect(polishArticleForSite(article)).toEqual(article);
+    const html = '<p>Clean paragraph.</p>';
+    expect(preprocessHtmlForSite(url, html)).toContain('Clean paragraph.');
   });
 });
 
@@ -1012,28 +1001,28 @@ describe('preprocessHtmlForSite for kyivpost.com', () => {
   });
 });
 
-describe('polishArticleForSite for heise.de', () => {
+describe('preprocessHtmlForSite for heise.de', () => {
   const url = 'https://www.heise.de/news/Example-Article-1234567.html';
 
-  it('strips the "Share this article" social widget by climbing to its Shortlink wrapper', () => {
+  it('strips the "Share this article" social widget by its article-sharing class', () => {
     const html =
       '<p>Real paragraph one.</p>' +
-      '<div class="share-widget"><h3>Share this article</h3>' +
+      '<div class="article-sharing article-footer__sharing"><h3>Share this article</h3>' +
       '<ul><li><a href="https://facebook.com/share">Facebook</a></li></ul>' +
       '<p>Shortlink: https://heise.de/-1234567</p></div>' +
       '<p>Real paragraph two.</p>';
 
-    const article = polishArticleForSite(fakeArticle({ url, content: html }));
+    const result = preprocessHtmlForSite(url, html);
 
-    expect(article.content).not.toContain('Share this article');
-    expect(article.content).not.toContain('Shortlink');
-    expect(article.content).toContain('Real paragraph one.');
-    expect(article.content).toContain('Real paragraph two.');
+    expect(result).not.toContain('Share this article');
+    expect(result).not.toContain('Shortlink');
+    expect(result).toContain('Real paragraph one.');
+    expect(result).toContain('Real paragraph two.');
   });
 
   it('leaves content untouched when the widget is absent', () => {
-    const article = fakeArticle({ url, content: '<p>Clean paragraph.</p>' });
-    expect(polishArticleForSite(article)).toEqual(article);
+    const html = '<p>Clean paragraph.</p>';
+    expect(preprocessHtmlForSite(url, html)).toContain('Clean paragraph.');
   });
 });
 

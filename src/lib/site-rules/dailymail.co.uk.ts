@@ -1,18 +1,10 @@
 import * as cheerio from 'cheerio';
-import type { ArticleData } from '../scraper';
 import type { SiteRule } from './types';
 
-// runs on the extracted content, not the raw page: a cheerio round-trip of
-// this site's raw HTML corrupts Readability's title/byline detection, even
-// with nothing removed. Readability also strips class attributes from its
-// output, so matching is by text rather than class.
 function stripWidgets($: cheerio.CheerioAPI): void {
-  $('p, span')
-    .filter((_, el) => /Published:/.test($(el).text()))
-    .each((_, el) => {
-      $(el).remove();
-    });
+  $('.byline-section').remove();
 
+  // no stable class survives for this one across articles, so match by text
   $('li, strong')
     .filter((_, el) => /Preferred Source/.test($(el).text()))
     .each((_, el) => {
@@ -21,12 +13,12 @@ function stripWidgets($: cheerio.CheerioAPI): void {
     });
 }
 
-function polishDailyMailArticle(article: ArticleData): ArticleData {
-  const $ = cheerio.load(article.content);
+function preprocessDailyMailHtml(html: string): string {
+  const $ = cheerio.load(html);
   stripWidgets($);
-  return { ...article, content: $('body').html() ?? article.content };
+  return $.html();
 }
 
 export const dailyMailRule: SiteRule = {
-  polishArticle: polishDailyMailArticle,
+  preprocessHtml: preprocessDailyMailHtml,
 };

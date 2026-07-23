@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ScrapeError, TakedownError, extractFirstImage, extractAuthor, extractArticle, isPaywallBoilerplate } from '@/lib/scraper';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { validateUrl, safeFetch } from '@/lib/urlSafety';
+import { hashUrl } from '@/lib/utils';
 
 vi.hoisted(() => {
   process.env.KV_URL = 'https://dummy-redis.example.com';
@@ -179,6 +180,30 @@ describe('POST /api/bypass', () => {
     expect(kv.set).toHaveBeenCalledTimes(2);
   });
 
+  it('uses the resolved canonical url (not the requested url) for the response id and cache key, and also caches under the requested url', async () => {
+    const { kv } = await import('@vercel/kv');
+    const mockArticle = {
+      title: 'Test Article',
+      content: '<p>Test content</p>',
+      textContent: 'Test content',
+      excerpt: 'Test',
+      byline: null,
+      image: null,
+      url: 'https://www.moneycontrol.com/news/real-article.html',
+    };
+
+    vi.mocked(scrapeArticle).mockResolvedValue(mockArticle);
+
+    const response = await POST(
+      createRequest({ url: 'https://www.moneycontrol.com/europe/?url=real-article' }),
+    );
+    const data = await response.json();
+
+    expect(data.url).toBe('https://www.moneycontrol.com/news/real-article.html');
+    // one setCachedArticle call per url (article + mapping key each) = 4 kv.set calls
+    expect(kv.set).toHaveBeenCalledTimes(4);
+  });
+
   it('returns cached article without scraping', async () => {
     const { kv } = await import('@vercel/kv');
     const cachedArticle = {
@@ -203,6 +228,29 @@ describe('POST /api/bypass', () => {
     expect(data.title).toBe('Cached Article');
     expect(data.cached).toBe(true);
     expect(scrapeArticle).not.toHaveBeenCalled();
+  });
+
+  it('uses the cached article\'s own url for the id on a cache hit, even if it differs from the requested url', async () => {
+    const { kv } = await import('@vercel/kv');
+    const cachedArticle = {
+      title: 'Cached Article',
+      content: '<p>Cached content</p>',
+      textContent: 'Cached content',
+      excerpt: 'Cached',
+      byline: 'Cached Author',
+      image: null,
+      url: 'https://www.moneycontrol.com/news/real-article.html',
+      scrapedAt: Date.now(),
+    };
+
+    vi.mocked(kv.get).mockResolvedValue(cachedArticle);
+
+    const response = await POST(
+      createRequest({ url: 'https://www.moneycontrol.com/europe/?url=real-article' }),
+    );
+    const data = await response.json();
+
+    expect(data.id).toBe(hashUrl(cachedArticle.url));
   });
 });
 
@@ -445,6 +493,62 @@ describe('takedowns integration', () => {
 
     expect(response.status).toBe(451);
     expect(data.error).toContain('gh-2');
+  });
+});
+
+describe('POST /api/ingest resolves canonical URL from the submitted html', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('uses the resolved canonical url for the response id and cache key, and also caches under the requested url', async () => {
+    const { kv } = await import('@vercel/kv');
+    const html =
+      '<html><head><link rel="canonical" href="https://www.moneycontrol.com/news/real-article.html"></head><body>' +
+      '<article><h1>Real headline</h1><p>' +
+      'This is a real article body with enough substance to be extracted correctly. '.repeat(10) +
+      '</p></article></body></html>';
+
+    const response = await ingestPOST(
+      createRequest(
+        { url: 'https://www.moneycontrol.com/europe/?url=real-article', html },
+        'http://localhost:3000/api/ingest',
+      ),
+    );
+    const data = await response.json();
+
+    expect(data.url).toBe('https://www.moneycontrol.com/news/real-article.html');
+    expect(data.id).toBe(hashUrl('https://www.moneycontrol.com/news/real-article.html'));
+    // one setCachedArticle call per url (article + mapping key each) = 4 kv.set calls
+    expect(kv.set).toHaveBeenCalledTimes(4);
+  });
+
+  it('uses the cached article\'s own url for the id on a cache hit, even if it differs from the requested url', async () => {
+    const { kv } = await import('@vercel/kv');
+    const cachedArticle = {
+      title: 'Cached Article',
+      content: '<p>Cached content</p>',
+      textContent: 'Cached content',
+      excerpt: 'Cached',
+      byline: null,
+      image: null,
+      url: 'https://www.moneycontrol.com/news/real-article.html',
+      scrapedAt: Date.now(),
+    };
+    vi.mocked(kv.get).mockResolvedValue(cachedArticle);
+
+    const response = await ingestPOST(
+      createRequest(
+        {
+          url: 'https://www.moneycontrol.com/europe/?url=real-article',
+          content: `<p>${'x'.repeat(250)}</p>`,
+        },
+        'http://localhost:3000/api/ingest',
+      ),
+    );
+    const data = await response.json();
+
+    expect(data.id).toBe(hashUrl(cachedArticle.url));
   });
 });
 
@@ -759,6 +863,73 @@ describe('extractArticle rejects paywall/legal boilerplate', () => {
     const article = extractArticle(html, 'https://example.com/article');
     expect(article).not.toBeNull();
     expect(article?.textContent).toContain('real article body');
+  });
+});
+
+describe('extractArticle resolves canonical URL from the page', () => {
+  const body =
+    '<article><h1>Real headline</h1><p>' +
+    'This is a real article body with enough substance to be extracted correctly. '.repeat(10) +
+    '</p></article>';
+
+  it('prefers <link rel=canonical> over the fetched (wrapped/redirect) URL', () => {
+    const html =
+      `<html><head><link rel="canonical" href="https://www.moneycontrol.com/news/real-article.html"></head><body>${body}</body></html>`;
+
+    const article = extractArticle(html, 'https://www.moneycontrol.com/europe/?url=real-article');
+    expect(article?.url).toBe('https://www.moneycontrol.com/news/real-article.html');
+  });
+
+  it('falls back to og:url when no canonical link is present', () => {
+    const html =
+      `<html><head><meta property="og:url" content="https://example.com/news/real-article"></head><body>${body}</body></html>`;
+
+    const article = extractArticle(html, 'https://example.com/amp/real-article');
+    expect(article?.url).toBe('https://example.com/news/real-article');
+  });
+
+  it('resolves a relative canonical href against the fetched URL', () => {
+    const html = `<html><head><link rel="canonical" href="/news/real-article.html"></head><body>${body}</body></html>`;
+
+    const article = extractArticle(html, 'https://example.com/europe/?url=real-article');
+    expect(article?.url).toBe('https://example.com/news/real-article.html');
+  });
+
+  it('falls back to the passed canonicalUrl when neither tag is present', () => {
+    const html = `<html><head></head><body>${body}</body></html>`;
+
+    const article = extractArticle(html, 'https://example.com/amp/real-article', 'https://example.com/real-article');
+    expect(article?.url).toBe('https://example.com/real-article');
+  });
+
+  it('falls back to fetchUrl when neither tag nor canonicalUrl override is present', () => {
+    const html = `<html><head></head><body>${body}</body></html>`;
+
+    const article = extractArticle(html, 'https://example.com/real-article');
+    expect(article?.url).toBe('https://example.com/real-article');
+  });
+
+  it('ignores a non-http(s) canonical href and falls back', () => {
+    const html = `<html><head><link rel="canonical" href="javascript:void(0)"></head><body>${body}</body></html>`;
+
+    const article = extractArticle(html, 'https://example.com/real-article');
+    expect(article?.url).toBe('https://example.com/real-article');
+  });
+
+  it('still applies the site rule matching the fetched page, not the resolved canonical host', () => {
+    // reuters.com's site rule strips zero-width characters from the title via
+    // polishArticle; the page was actually fetched from reuters.com, so that
+    // rule must still apply, even though its canonical tag points elsewhere
+    const zeroWidthSpace = String.fromCharCode(0x200b);
+    const html =
+      '<html><head><link rel="canonical" href="https://syndicate.example.com/real-article"></head><body>' +
+      `<article><h1>Real${zeroWidthSpace} headline</h1><p>` +
+      'This is a real article body with enough substance to be extracted correctly. '.repeat(10) +
+      '</p></article></body></html>';
+
+    const article = extractArticle(html, 'https://www.reuters.com/world/real-article/');
+    expect(article?.url).toBe('https://syndicate.example.com/real-article');
+    expect(article?.title).toBe('Real headline');
   });
 });
 

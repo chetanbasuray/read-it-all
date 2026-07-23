@@ -125,9 +125,9 @@ export async function POST(request: NextRequest) {
     article.content = sanitizeHtml(article.content);
 
     const existing = await getCachedArticle(canonicalUrl);
-    const id = hashUrl(canonicalUrl);
 
     if (existing) {
+      const id = hashUrl(existing.url);
       const views = await getArticleViews(id);
       return NextResponse.json(
         {
@@ -140,11 +140,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    await setCachedArticle(canonicalUrl, article);
+    await setCachedArticle(article.url, article);
+    // also cache under the requested (pre-canonical-resolution) url, so a repeat
+    // visit via the same wrapped/redirect link hits cache instead of re-ingesting
+    if (article.url !== canonicalUrl) {
+      await setCachedArticle(canonicalUrl, article);
+    }
 
     return NextResponse.json(
       {
-        id,
+        id: hashUrl(article.url),
         ...article,
         cached: false,
         views: 0,

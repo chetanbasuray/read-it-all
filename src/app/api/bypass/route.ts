@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
       const cached = await getCachedArticle(canonicalUrl);
       if (cached) {
         return NextResponse.json({
-          id: hashUrl(canonicalUrl),
+          id: hashUrl(cached.url),
           ...cached,
           cached: true,
         });
@@ -57,13 +57,17 @@ export async function POST(request: NextRequest) {
 
     const article = await scrapeArticle(canonicalUrl, cookies);
     if (!cookies) {
-      await setCachedArticle(canonicalUrl, { ...article, url: canonicalUrl });
+      await setCachedArticle(article.url, article);
+      // also cache under the requested (pre-canonical-resolution) url, so a repeat
+      // visit via the same wrapped/redirect link hits cache instead of re-scraping
+      if (article.url !== canonicalUrl) {
+        await setCachedArticle(canonicalUrl, article);
+      }
     }
 
     return NextResponse.json({
-      id: hashUrl(canonicalUrl),
+      id: hashUrl(article.url),
       ...article,
-      url: canonicalUrl,
       cached: false,
     });
   } catch (error) {

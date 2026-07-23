@@ -153,6 +153,22 @@ export function extractFromJsonLd(
   return null;
 }
 
+// publishers set these tags specifically to point at the "real" canonical
+// URL for an article, even when it was fetched via a region-redirect or
+// tracking wrapper (e.g. moneycontrol.com's /europe/?url=<encoded> path)
+export function extractCanonicalUrl(html: string, baseUrl: string): string | null {
+  const $ = cheerio.load(html);
+  const href = $('link[rel="canonical"]').attr('href') || $('meta[property="og:url"]').attr('content');
+  if (!href) return null;
+  try {
+    const resolved = new URL(href, baseUrl);
+    if (resolved.protocol !== 'http:' && resolved.protocol !== 'https:') return null;
+    return resolved.href;
+  } catch {
+    return null;
+  }
+}
+
 export function extractFirstImage(html: string, baseUrl: string): string | null {
   const $ = cheerio.load(html);
   const ogImage = $('meta[property="og:image"]').attr('content');
@@ -455,9 +471,13 @@ function $tryExtractContentFromNoscript(html: string): string | null {
 // shared by every fallback tier (direct fetch, warmup, AMP, browser render,
 // Google Cache, Wayback) so a per-domain rule only needs to be wired in once.
 // fetchUrl is what was actually requested/parsed (matters for relative image resolution
-// on an AMP page); canonicalUrl is what gets stored as article.url for display/caching.
+// and site-rule lookup); canonicalUrl is the fallback used as article.url when the page
+// itself has no <link rel=canonical>/og:url to resolve a truer identity from.
 export function extractArticle(html: string, fetchUrl: string, canonicalUrl: string = fetchUrl): ArticleData | null {
   const preprocessed = preprocessHtmlForSite(fetchUrl, html);
+  // site-rule lookup below stays keyed on fetchUrl (the page actually parsed);
+  // only the final stored/displayed url is swapped to the resolved canonical
+  const resolvedUrl = extractCanonicalUrl(preprocessed, fetchUrl) ?? canonicalUrl;
 
   const jsonld = extractFromJsonLd(preprocessed);
   if (jsonld && jsonld.content && jsonld.content.length > 200) {
@@ -468,19 +488,21 @@ export function extractArticle(html: string, fetchUrl: string, canonicalUrl: str
       excerpt: jsonld.textContent?.substring(0, 200) || '',
       byline: jsonld.byline || extractAuthor(preprocessed) || null,
       image: jsonld.image || extractFirstImage(preprocessed, fetchUrl),
-      url: canonicalUrl,
+      url: fetchUrl,
     };
-    if (!isPaywallBoilerplate(candidate)) return polishArticleForSite(candidate);
+    if (!isPaywallBoilerplate(candidate)) {
+      return { ...polishArticleForSite(candidate), url: resolvedUrl };
+    }
   }
 
   const fromMeta = buildArticleFromMetadata(preprocessed, fetchUrl);
   if (fromMeta && !isPaywallBoilerplate(fromMeta)) {
-    return polishArticleForSite({ ...fromMeta, url: canonicalUrl });
+    return { ...polishArticleForSite({ ...fromMeta, url: fetchUrl }), url: resolvedUrl };
   }
 
   const article = parseWithReadability(preprocessed, fetchUrl);
   if (article && !isPaywallBoilerplate(article)) {
-    return polishArticleForSite({ ...article, url: canonicalUrl });
+    return { ...polishArticleForSite({ ...article, url: fetchUrl }), url: resolvedUrl };
   }
 
   return null;

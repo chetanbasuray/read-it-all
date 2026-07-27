@@ -738,12 +738,13 @@ describe('preprocessHtmlForSite for pravda.com.ua', () => {
 describe('preprocessHtmlForSite for dw.com', () => {
   const url = 'https://www.dw.com/de/example/a-1';
 
-  it('strips the category kicker, the duplicate numeric date, and the feedback CTA', () => {
+  it('strips the category kicker, the duplicate numeric date, the feedback CTA, and the preferred-source plea', () => {
     const html =
       '<header><div data-tracking-name="content-detail-kicker"><span>Politik</span><span>Deutschland</span></div>' +
       '<h1>Real headline</h1></header>' +
       '<span class="publication"><time aria-hidden="true">15.07.2026</time><span>15. Juli 2026</span></span>' +
       '<p>Real paragraph one.</p>' +
+      '<p><em>Don\'t let the algorithm hide the news. Please select us as your Preferred Source on Google.</em></p>' +
       '<footer class="c1jc41xr"><div class="feedback"><div role="button" data-tracking-name="feedback-button">Schicken Sie uns Ihr Feedback!</div></div></footer>';
 
     const result = preprocessHtmlForSite(url, html);
@@ -752,6 +753,7 @@ describe('preprocessHtmlForSite for dw.com', () => {
     expect(result).not.toContain('15.07.2026');
     expect(result).toContain('15. Juli 2026');
     expect(result).not.toContain('Schicken Sie uns');
+    expect(result).not.toContain('Preferred Source on Google');
     expect(result).toContain('Real headline');
     expect(result).toContain('Real paragraph one.');
   });
@@ -1234,6 +1236,64 @@ describe('preprocessHtmlForSite for hartpunkt.de', () => {
   });
 
   it('leaves content untouched when no ad slot is present', () => {
+    const html = '<p>Clean paragraph.</p>';
+    expect(preprocessHtmlForSite(url, html)).toContain('Clean paragraph.');
+  });
+});
+
+describe('preprocessHtmlForSite for apnews.com', () => {
+  const url = 'https://apnews.com/article/example-article';
+
+  it('strips the translated-story link and unrendered timestamp template that Readability glues onto a bylineless article', () => {
+    const html =
+      '<p>Real paragraph one.</p>' +
+      '<div class="Page-byline"><div class="Page-byline-info">' +
+      '<div class="Page-dateModified">Updated [hour]:[minute] [AMPM]</div>' +
+      '<div class="Page-translatedStoryLink"><a href="/es/example">Leer en español</a></div>' +
+      '</div></div>';
+
+    const result = preprocessHtmlForSite(url, html);
+
+    expect(result).not.toContain('Leer en español');
+    expect(result).not.toContain('[hour]');
+    expect(result).toContain('Real paragraph one.');
+  });
+
+  it('strips an unrelated promo card\'s own "byline" container (its reading-time badge, not this article\'s byline)', () => {
+    const html =
+      '<p>Real paragraph one.</p>' +
+      '<div class="PagePromo-byline-container"><span class="ReadingTime-template">3 MIN READ</span></div>';
+
+    const result = preprocessHtmlForSite(url, html);
+
+    expect(result).not.toContain('MIN READ');
+    expect(result).toContain('Real paragraph one.');
+  });
+
+  it('leaves a real byline element untouched', () => {
+    const html = '<div class="Page-authors">By Jane Reporter</div><p>Real paragraph.</p>';
+    const result = preprocessHtmlForSite(url, html);
+    expect(result).toContain('By Jane Reporter');
+  });
+});
+
+describe('preprocessHtmlForSite for nytimes.com', () => {
+  const url = 'https://www.nytimes.com/athletic/example-article/';
+
+  it('strips The Athletic\'s "Connections" puzzle promo card', () => {
+    const html =
+      '<p>Real paragraph one.</p>' +
+      '<div class="PuzzleEntryPoint_PuzzleContainer__eVJWr"><h2>Connections: Sports Edition</h2>' +
+      '<p>Spot the pattern. Connect the terms</p></div>';
+
+    const result = preprocessHtmlForSite(url, html);
+
+    expect(result).not.toContain('Connections: Sports Edition');
+    expect(result).not.toContain('Spot the pattern');
+    expect(result).toContain('Real paragraph one.');
+  });
+
+  it('leaves content untouched when no puzzle promo is present', () => {
     const html = '<p>Clean paragraph.</p>';
     expect(preprocessHtmlForSite(url, html)).toContain('Clean paragraph.');
   });

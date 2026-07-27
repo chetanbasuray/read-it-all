@@ -107,6 +107,41 @@ function parseJsonLd(raw: string): any {
   }
 }
 
+// schema.org's "author" is valid as either a single Person/Organization or an
+// array of them (multi-byline articles); a plain `.name` lookup silently
+// returns undefined for the array form, which is common even for single-author pieces
+function authorNameFromJsonLd(author: unknown): string | null {
+  if (!author) return null;
+  const people = Array.isArray(author) ? author : [author];
+  const names = people
+    .map((p) =>
+      p && typeof p === 'object' && 'name' in p
+        ? String((p as { name: unknown }).name).replace(/\s+/g, ' ').trim()
+        : null,
+    )
+    .filter((n): n is string => !!n);
+  return names.length ? names.join(', ') : null;
+}
+
+// scans every ld+json script for an author, independent of whether any of them
+// also carry an articleBody long enough for extractFromJsonLd's content tier to use
+function extractJsonLdAuthorName(html: string): string | null {
+  const $ = cheerio.load(html);
+  for (const el of $('script[type="application/ld+json"]')) {
+    try {
+      const data = parseJsonLd($(el).text());
+      const items = Array.isArray(data) ? data : data['@graph'] || [data];
+      for (const item of items) {
+        const name = authorNameFromJsonLd(item.author);
+        if (name) return name;
+      }
+    } catch {
+      // continue to next script tag
+    }
+  }
+  return null;
+}
+
 export function extractFromJsonLd(
   html: string,
 ): Pick<ArticleData, 'title' | 'content' | 'textContent' | 'byline' | 'image'> | null {
@@ -137,7 +172,7 @@ export function extractFromJsonLd(
                 .join(''),
             ),
             textContent: item.articleBody,
-            byline: item.author?.name || null,
+            byline: authorNameFromJsonLd(item.author),
             image:
               item.image?.url ||
               (typeof item.image === 'string' ? item.image : null) ||
@@ -199,19 +234,31 @@ export function extractTitle(html: string): string | null {
   return null;
 }
 
+// meta tag / JSON-LD, in that order: both are structured data a publisher
+// deliberately set for this exact purpose, more reliable than any DOM guess
+function extractStructuredAuthor(html: string): string | null {
+  const author = cheerio.load(html)('meta[name="author"]').attr('content');
+  return author || extractJsonLdAuthorName(html);
+}
+
+// a bracketed placeholder (e.g. AP's "Updated [hour]:[minute] [AMPM]") means the
+// candidate is an unrendered client-side timestamp widget, not a byline
+function isRealByline(text: string | null | undefined): text is string {
+  return !!text && !/\[[a-zA-Z]+\]/.test(text);
+}
+
 export function extractAuthor(html: string): string | null {
-  const $ = cheerio.load(html);
-  const author = $('meta[name="author"]').attr('content');
-  if (author) return author;
+  const structured = extractStructuredAuthor(html);
+  if (structured) return structured;
   // a byline can span sibling elements ("By" + a linked name), leaving the
   // source's own indentation/newlines between them in the joined text
-  const byline = $('[class*="byline" i], [class*="author" i], [class*="by-line" i]')
+  const byline = cheerio
+    .load(html)('[class*="byline" i], [class*="author" i], [class*="by-line" i]')
     .first()
     .text()
     .replace(/\s+/g, ' ')
     .trim();
-  if (byline) return byline;
-  return null;
+  return isRealByline(byline) ? byline : null;
 }
 
 function isConsentGatewayUrl(url: string): boolean {
@@ -268,7 +315,7 @@ async function fetchWithUA(
 
 // mimics a visitor landing on the homepage before navigating to an article,
 // picking up whatever session/consent cookies a cold article-URL request wouldn't
-async function fetchWarmupCookies(url: string, ua: string): Promise<string | null> {
+async function fetchWarmupCookies(url: string, ua: string, xff?: string): Promise<string | null> {
   try {
     const homepageUrl = new URL(url).origin;
     const controller = new AbortController();
@@ -278,6 +325,7 @@ async function fetchWarmupCookies(url: string, ua: string): Promise<string | nul
       headers: {
         'User-Agent': ua,
         Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        ...(xff ? { 'X-Forwarded-For': xff } : {}),
       },
     });
     clearTimeout(timeout);
@@ -395,10 +443,15 @@ export function parseWithReadability(html: string, url: string): ArticleData | n
     const article = reader.parse();
 
     if (article && article.content && article.content.length > 200) {
-      // Readability's own byline detection can join sibling DOM text nodes
-      // (e.g. "By" and a linked name) with the source's original indentation/
-      // newlines still between them; no legitimate byline needs that whitespace
-      const rawByline = article.byline || extractAuthor(html) || null;
+      // Readability's own byline detection can glue sibling DOM text nodes onto
+      // the name (a reading-time badge, an "Updated:" timestamp, ...) with the
+      // source's original indentation/newlines still between them; a publisher's
+      // own structured author data is never wrong this way, so it wins when present
+      const rawByline =
+        extractStructuredAuthor(html) ||
+        (isRealByline(article.byline) ? article.byline : null) ||
+        extractAuthor(html) ||
+        null;
       return {
         title: article.title || extractTitle(html) || 'Untitled',
         content: sanitizeHtml(article.content),
@@ -520,14 +573,21 @@ function extractAmpUrl(originalUrl: string): string | null {
   }
 }
 
+// xff: a real, published crawler IP (Google's 66.249.64.0/19, Bing's
+// 40.77.167.0/24) sent as X-Forwarded-For alongside the matching bot UA;
+// some sites allowlist these ranges for search-engine crawlers and trust
+// this header rather than the actual TCP source, which Vercel's shared
+// datacenter IP range is otherwise liable to be blocked on outright
 const USER_AGENTS = [
   {
     ua: 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
     name: 'Googlebot',
+    xff: '66.249.66.1',
   },
   {
     ua: 'Mozilla/5.0 (compatible; Bingbot/2.0; +http://www.bing.com/bingbot.htm)',
     name: 'Bingbot',
+    xff: '40.77.167.1',
   },
   {
     ua: 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
@@ -536,6 +596,7 @@ const USER_AGENTS = [
   {
     ua: 'Mozilla/5.0 (Linux; Android 6.0.1; Nexus 5X Build/MMB29P) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.6998.0 Mobile Safari/537.36 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
     name: 'Googlebot-Mobile',
+    xff: '66.249.66.1',
   },
   {
     ua: 'Twitterbot/1.0',
@@ -544,6 +605,7 @@ const USER_AGENTS = [
   {
     ua: 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/131.0.6998.0 Safari/537.36',
     name: 'Googlebot-Desktop',
+    xff: '66.249.66.1',
   },
 ];
 
@@ -566,9 +628,10 @@ async function attemptScrape(
   const errors: string[] = [];
   let allBlocked = true;
 
-  for (const { ua, name } of USER_AGENTS) {
+  for (const { ua, name, xff } of USER_AGENTS) {
     for (const headers of ACCEPT_VARIANTS) {
-      const { html, status, blocked } = await fetchWithUA(url, ua, headers, cookies);
+      const requestHeaders = xff ? { ...headers, 'X-Forwarded-For': xff } : headers;
+      const { html, status, blocked } = await fetchWithUA(url, ua, requestHeaders, cookies);
       if (!html) {
         if (status !== null) {
           errors.push(`HTTP ${status} (${name})`);
@@ -594,10 +657,11 @@ async function attemptScrape(
 
   // cheaper than an AMP retry or full browser render: fetch the homepage first
   // to pick up session/consent cookies a cold article request never gets offered
-  const warmupCookies = await fetchWarmupCookies(url, USER_AGENTS[0].ua);
+  const warmupCookies = await fetchWarmupCookies(url, USER_AGENTS[0].ua, USER_AGENTS[0].xff);
   if (warmupCookies) {
     const mergedCookies = cookies ? `${cookies}; ${warmupCookies}` : warmupCookies;
-    const { html, blocked } = await fetchWithUA(url, USER_AGENTS[0].ua, undefined, mergedCookies);
+    const warmupHeaders = USER_AGENTS[0].xff ? { 'X-Forwarded-For': USER_AGENTS[0].xff } : undefined;
+    const { html, blocked } = await fetchWithUA(url, USER_AGENTS[0].ua, warmupHeaders, mergedCookies);
     if (html && !blocked && html.length > 500) {
       const article = extractArticle(html, url);
       if (article) return { article, tier: 'warmup' };
@@ -615,9 +679,10 @@ async function attemptScrape(
     const ampUrl = extractAmpUrl(url);
     if (ampUrl) {
       errors.push(`Trying AMP URL: ${ampUrl}`);
-      for (const { ua, name } of USER_AGENTS.slice(0, 2)) {
+      for (const { ua, name, xff } of USER_AGENTS.slice(0, 2)) {
         const { html, blocked } = await fetchWithUA(ampUrl, ua, {
           Referer: 'https://www.google.com/',
+          ...(xff ? { 'X-Forwarded-For': xff } : {}),
         }, cookies);
         if (html && !blocked && html.length > 500) {
           const article = extractArticle(html, ampUrl, url);

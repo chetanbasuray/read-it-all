@@ -34,6 +34,8 @@ import { nationalDeskRule } from './thenationaldesk.com';
 import { newIndianExpressRule } from './newindianexpress.com';
 import { news18Rule } from './news18.com';
 import { hartpunktRule } from './hartpunkt.de';
+import { apNewsRule } from './apnews.com';
+import { nytimesRule } from './nytimes.com';
 
 export const SITE_RULES: Record<string, SiteRule> = {
   'bbc.com': bbcRule,
@@ -73,6 +75,8 @@ export const SITE_RULES: Record<string, SiteRule> = {
   'newindianexpress.com': newIndianExpressRule,
   'news18.com': news18Rule,
   'hartpunkt.de': hartpunktRule,
+  'apnews.com': apNewsRule,
+  'nytimes.com': nytimesRule,
 };
 
 function getSiteRule(url: string): SiteRule | null {

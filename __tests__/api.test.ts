@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ScrapeError, TakedownError, extractFirstImage, extractAuthor, extractArticle, isPaywallBoilerplate } from '@/lib/scraper';
+import { ScrapeError, TakedownError, extractFirstImage, extractAuthor, extractArticle, isPaywallBoilerplate, parseWithReadability } from '@/lib/scraper';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { validateUrl, safeFetch } from '@/lib/urlSafety';
 import { hashUrl } from '@/lib/utils';
@@ -784,6 +784,51 @@ describe('extractAuthor', () => {
   it('collapses internal whitespace between sibling byline text nodes', () => {
     const result = extractAuthor('<div class="byline">By&nbsp;\n            <a href="/author">ANNIKA HAMMERSCHLAG</a></div>');
     expect(result).toBe('By ANNIKA HAMMERSCHLAG');
+  });
+
+  it('prefers JSON-LD author over a class-based byline element, even with no articleBody present', () => {
+    const html =
+      '<html><head><script type="application/ld+json">' +
+      JSON.stringify({ '@type': 'NewsArticle', author: { name: 'JSON-LD Author' } }) +
+      '</script></head><body><div class="byline">Wrong DOM Author</div></body></html>';
+    expect(extractAuthor(html)).toBe('JSON-LD Author');
+  });
+
+  it('handles a JSON-LD author array (common even for a single author)', () => {
+    const html =
+      '<html><head><script type="application/ld+json">' +
+      JSON.stringify({ '@type': 'NewsArticle', author: [{ name: 'Array Author' }] }) +
+      '</script></head><body></body></html>';
+    expect(extractAuthor(html)).toBe('Array Author');
+  });
+
+  it('rejects a DOM byline candidate that is an unrendered template placeholder', () => {
+    const html = '<div class="byline">Updated [hour]:[minute] [AMPM] Leer en español</div>';
+    expect(extractAuthor(html)).toBeNull();
+  });
+});
+
+describe('parseWithReadability byline priority', () => {
+  it('prefers a structured (meta/JSON-LD) author over what Readability itself detected', () => {
+    const html =
+      '<html><head><meta name="author" content="Real Author"></head><body><article><h1>Real headline</h1>' +
+      '<div class="byline">Glued Wrong Text From Readability</div><p>' +
+      'This is a real article body with enough substance to be extracted correctly. '.repeat(10) +
+      '</p></article></body></html>';
+
+    const article = parseWithReadability(html, 'https://example.com/article');
+    expect(article?.byline).toBe('Real Author');
+  });
+
+  it('rejects an unrendered-template Readability byline guess and falls back to null', () => {
+    const html =
+      '<html><body><article><h1>Real headline</h1>' +
+      '<div class="byline">Updated [hour]:[minute] [AMPM] Leer en español</div><p>' +
+      'This is a real article body with enough substance to be extracted correctly. '.repeat(10) +
+      '</p></article></body></html>';
+
+    const article = parseWithReadability(html, 'https://example.com/article');
+    expect(article?.byline).toBeNull();
   });
 });
 

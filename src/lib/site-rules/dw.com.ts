@@ -22,11 +22,20 @@ function stripFeedbackWidget($: cheerio.CheerioAPI): void {
   $('[data-tracking-name="feedback-button"]').closest('.feedback').remove();
 }
 
+// a "select us as your Preferred Source on Google" plea is a plain paragraph
+// with no distinguishing class, matched by its stable text instead
+function stripPreferredSourceCta($: cheerio.CheerioAPI): void {
+  $('p')
+    .filter((_, el) => /Preferred Source on Google/.test($(el).text()))
+    .remove();
+}
+
 function preprocessDwHtml(html: string): string {
   const $ = cheerio.load(html);
   stripKicker($);
   dedupePublishDate($);
   stripFeedbackWidget($);
+  stripPreferredSourceCta($);
   return $.html();
 }
 

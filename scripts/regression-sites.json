@@ -175,5 +175,25 @@
     "domain": "hartpunkt.de",
     "url": "https://www.hartpunkt.de/alternative-zu-patriot-macron-bietet-deutschland-koproduktion-beim-luftverteidigungssystem-samp-t-ng-an/",
     "status": "known-good"
+  },
+  {
+    "domain": "apnews.com",
+    "url": "https://apnews.com/article/iran-us-hormuz-strait-war-qatar-pakistan-d57e675a7be6dbdd34561909ced240d0",
+    "status": "known-good"
+  },
+  {
+    "domain": "cbsnews.com",
+    "url": "https://www.cbsnews.com/news/us-labor-shortage-boomer-retirements-wages/",
+    "status": "known-good"
+  },
+  {
+    "domain": "pressinsider.com",
+    "url": "https://pressinsider.com/news/russia-imports-indian-fuel-as-ukrainian-strikes-cripple-refineries-report/",
+    "status": "known-good"
+  },
+  {
+    "domain": "nytimes.com",
+    "url": "https://www.nytimes.com/athletic/7397153/2026/07/24/maxence-lacroix-chelsea-crystal-palace-deal-transfer/",
+    "status": "known-good"
   }
 ]

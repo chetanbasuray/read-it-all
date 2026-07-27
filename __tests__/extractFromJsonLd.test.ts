@@ -59,4 +59,28 @@ describe('extractFromJsonLd', () => {
     const html = withScript(JSON.stringify({ '@type': 'NewsArticle', headline: 'Too Short', articleBody: 'short' }));
     expect(extractFromJsonLd(html)).toBeNull();
   });
+
+  it('extracts a byline when author is an array (valid schema.org shape, common for a single author)', () => {
+    const html = withScript(
+      JSON.stringify({
+        '@type': 'NewsArticle',
+        headline: 'Title',
+        articleBody: 'a'.repeat(250),
+        author: [{ '@type': 'Person', name: 'Array Author' }],
+      }),
+    );
+    expect(extractFromJsonLd(html)?.byline).toBe('Array Author');
+  });
+
+  it('joins multiple authors from an array with a comma', () => {
+    const html = withScript(
+      JSON.stringify({
+        '@type': 'NewsArticle',
+        headline: 'Title',
+        articleBody: 'a'.repeat(250),
+        author: [{ '@type': 'Person', name: 'First Author' }, { '@type': 'Person', name: 'Second Author' }],
+      }),
+    );
+    expect(extractFromJsonLd(html)?.byline).toBe('First Author, Second Author');
+  });
 });

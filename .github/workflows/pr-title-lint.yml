@@ -28,9 +28,9 @@ jobs:
   lint-branch-name:
     runs-on: ubuntu-latest
     steps:
-      - name: Check branch name is feat/* or fix/*
+      - name: Check branch name is feat/*, fix/*, or a Dependabot branch
         run: |
-          if [[ ! "${{ github.head_ref }}" =~ ^(feat|fix)/.+ ]]; then
-            echo "Branch '${{ github.head_ref }}' must start with feat/ or fix/"
+          if [[ ! "${{ github.head_ref }}" =~ ^(feat|fix)/.+ ]] && [[ ! "${{ github.head_ref }}" =~ ^dependabot/ ]]; then
+            echo "Branch '${{ github.head_ref }}' must start with feat/, fix/, or dependabot/"
             exit 1
           fi

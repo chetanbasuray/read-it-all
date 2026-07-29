@@ -10,12 +10,6 @@
     "status": "known-good"
   },
   {
-    "domain": "telegraph.co.uk",
-    "url": "https://www.telegraph.co.uk/news/2026/05/25/schoolboys-ai-girlfriends/",
-    "status": "known-good",
-    "note": "No site rule needed: extracted cleanly via JSON-LD despite the site's own hard paywall."
-  },
-  {
     "domain": "timesofindia.indiatimes.com",
     "url": "https://timesofindia.indiatimes.com/city/ghaziabad/wanted-papers-for-his-share-drunk-son-pumps-3-bullets-into-father-in-ghaziabad-over-rs-150-crore-property-dispute/articleshow/132432885.cms",
     "status": "known-good"

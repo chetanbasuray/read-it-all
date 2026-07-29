@@ -1008,7 +1008,7 @@ describe('extractArticle resolves canonical URL from the page', () => {
 describe('generateMetadata (reader/[id])', () => {
   it('returns article-specific OG tags when cached', async () => {
     const { kv } = await import('@vercel/kv');
-    const { generateMetadata } = await import('@/app/reader/[id]/page');
+    const { generateMetadata } = await import('@/app/(with-sidebar)/reader/[id]/page');
 
     vi.mocked(kv.get).mockResolvedValueOnce({
       title: 'Big News Story',
@@ -1031,7 +1031,7 @@ describe('generateMetadata (reader/[id])', () => {
 
   it('falls back to a generic title when the article is missing', async () => {
     const { kv } = await import('@vercel/kv');
-    const { generateMetadata } = await import('@/app/reader/[id]/page');
+    const { generateMetadata } = await import('@/app/(with-sidebar)/reader/[id]/page');
 
     vi.mocked(kv.get).mockResolvedValueOnce(null);
 
@@ -1148,7 +1148,7 @@ describe('ReaderPage recovery from expired content', () => {
 
   it('redirects to /reader/bypass when content expired but the url mapping survives', async () => {
     const { kv } = await import('@vercel/kv');
-    const ReaderPageModule = await import('@/app/reader/[id]/page');
+    const ReaderPageModule = await import('@/app/(with-sidebar)/reader/[id]/page');
 
     vi.mocked(kv.get)
       .mockResolvedValueOnce(null)
@@ -1161,7 +1161,7 @@ describe('ReaderPage recovery from expired content', () => {
 
   it('shows the not-found page when neither content nor mapping exist', async () => {
     const { kv } = await import('@vercel/kv');
-    const ReaderPageModule = await import('@/app/reader/[id]/page');
+    const ReaderPageModule = await import('@/app/(with-sidebar)/reader/[id]/page');
 
     vi.mocked(kv.get).mockResolvedValue(null);
 

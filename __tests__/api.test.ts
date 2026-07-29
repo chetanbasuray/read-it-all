@@ -911,6 +911,33 @@ describe('extractArticle rejects paywall/legal boilerplate', () => {
   });
 });
 
+describe('extractArticle strips a duplicate lead image from content', () => {
+  it('removes an in-body image matching the lead image, ignoring CDN resize params', () => {
+    const html =
+      '<html><head><meta property="og:image" content="https://example.com/cdn-cgi/image/width=1200/wp-content/uploads/photo.jpg">' +
+      '</head><body><article><h1>Real headline</h1>' +
+      '<figure><img src="https://example.com/cdn-cgi/image/width=600/wp-content/uploads/photo.jpg"></figure>' +
+      '<p>' + 'This is a real article body with enough substance to be extracted correctly. '.repeat(10) + '</p>' +
+      '</article></body></html>';
+
+    const article = extractArticle(html, 'https://example.com/real-article');
+    expect(article?.content).not.toContain('<img');
+    expect(article?.content).toContain('real article body');
+  });
+
+  it('keeps an in-body image that is a different photo from the lead image', () => {
+    const html =
+      '<html><head><meta property="og:image" content="https://example.com/wp-content/uploads/lead.jpg">' +
+      '</head><body><article><h1>Real headline</h1>' +
+      '<figure><img src="https://example.com/wp-content/uploads/inline-1024x683.jpg"></figure>' +
+      '<p>' + 'This is a real article body with enough substance to be extracted correctly. '.repeat(10) + '</p>' +
+      '</article></body></html>';
+
+    const article = extractArticle(html, 'https://example.com/real-article');
+    expect(article?.content).toContain('inline-1024x683.jpg');
+  });
+});
+
 describe('extractArticle resolves canonical URL from the page', () => {
   const body =
     '<article><h1>Real headline</h1><p>' +

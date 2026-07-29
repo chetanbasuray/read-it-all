@@ -195,5 +195,10 @@
     "domain": "nytimes.com",
     "url": "https://www.nytimes.com/athletic/7397153/2026/07/24/maxence-lacroix-chelsea-crystal-palace-deal-transfer/",
     "status": "known-good"
+  },
+  {
+    "domain": "politico.eu",
+    "url": "https://www.politico.eu/article/france-german-deal-eu-auto-industry-made-in-europe/",
+    "status": "known-good"
   }
 ]

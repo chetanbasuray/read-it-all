@@ -1298,3 +1298,33 @@ describe('preprocessHtmlForSite for nytimes.com', () => {
     expect(preprocessHtmlForSite(url, html)).toContain('Clean paragraph.');
   });
 });
+
+describe('preprocessHtmlForSite for politico.eu', () => {
+  const url = 'https://www.politico.eu/article/example-article/';
+
+  it('strips the related-articles grid, in-article asides, breadcrumb, listen widget, and share nav', () => {
+    const html =
+      '<nav aria-label="Breadcrumb"><a href="/news">News</a></nav>' +
+      '<p>Real paragraph one.</p>' +
+      '<aside class="ad ad__rectangle_4">Advertisement</aside>' +
+      '<div class="listen  listen--has-toggle"><button>Listen</button><p>AI generated Text-to-speech</p></div>' +
+      '<nav aria-label="Share"><a href="#">Copy Link</a></nav>' +
+      '<div class="content-listing content-listing__columns--4"><a>Unrelated teaser headline</a></div>' +
+      '<p>Real paragraph two.</p>';
+
+    const result = preprocessHtmlForSite(url, html);
+
+    expect(result).not.toContain('News');
+    expect(result).not.toContain('Advertisement');
+    expect(result).not.toContain('AI generated');
+    expect(result).not.toContain('Copy Link');
+    expect(result).not.toContain('Unrelated teaser headline');
+    expect(result).toContain('Real paragraph one.');
+    expect(result).toContain('Real paragraph two.');
+  });
+
+  it('leaves content untouched when none of the known junk is present', () => {
+    const html = '<p>Clean paragraph.</p>';
+    expect(preprocessHtmlForSite(url, html)).toContain('Clean paragraph.');
+  });
+});

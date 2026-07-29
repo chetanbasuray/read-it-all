@@ -204,6 +204,39 @@ export function extractCanonicalUrl(html: string, baseUrl: string): string | nul
   }
 }
 
+// resolves what an image URL actually points at, unwrapping a Cloudflare-style
+// resize proxy (/cdn-cgi/image/<params>/<realPath>) and a WordPress-style
+// "-WIDTHxHEIGHT" resize suffix, so two differently-sized renditions of the
+// same source photo compare equal
+function coreImageIdentity(rawUrl: string, baseUrl: string): string | null {
+  try {
+    const u = new URL(rawUrl, baseUrl);
+    const cdnCgiMatch = u.pathname.match(/\/cdn-cgi\/image\/[^/]+\/(.+)$/);
+    const pathname = cdnCgiMatch ? `/${cdnCgiMatch[1]}` : u.pathname;
+    const filename = pathname.split('/').pop() || '';
+    return filename.replace(/-\d+x\d+(?=\.\w+$)/, '');
+  } catch {
+    return null;
+  }
+}
+
+// the reader UI renders `image` as a hero above the headline and `content`
+// verbatim below it; when a source's first in-body image is the same photo
+// used as the lead/og:image, that photo would otherwise render twice
+function stripDuplicateLeadImage(content: string, image: string | null, baseUrl: string): string {
+  if (!image) return content;
+  const $ = cheerio.load(content);
+  const firstImg = $('img').first();
+  const src = firstImg.attr('src');
+  if (!src) return content;
+  const a = coreImageIdentity(src, baseUrl);
+  const b = coreImageIdentity(image, baseUrl);
+  if (!a || a !== b) return content;
+  const figure = firstImg.closest('figure');
+  (figure.length ? figure : firstImg).remove();
+  return $('body').html() || content;
+}
+
 export function extractFirstImage(html: string, baseUrl: string): string | null {
   const $ = cheerio.load(html);
   const ogImage = $('meta[property="og:image"]').attr('content');
@@ -526,6 +559,11 @@ function $tryExtractContentFromNoscript(html: string): string | null {
 // fetchUrl is what was actually requested/parsed (matters for relative image resolution
 // and site-rule lookup); canonicalUrl is the fallback used as article.url when the page
 // itself has no <link rel=canonical>/og:url to resolve a truer identity from.
+function finalizeArticle(article: ArticleData, resolvedUrl: string, fetchUrl: string): ArticleData {
+  const polished = { ...polishArticleForSite(article), url: resolvedUrl };
+  return { ...polished, content: stripDuplicateLeadImage(polished.content, polished.image, fetchUrl) };
+}
+
 export function extractArticle(html: string, fetchUrl: string, canonicalUrl: string = fetchUrl): ArticleData | null {
   const preprocessed = preprocessHtmlForSite(fetchUrl, html);
   // site-rule lookup below stays keyed on fetchUrl (the page actually parsed);
@@ -544,18 +582,18 @@ export function extractArticle(html: string, fetchUrl: string, canonicalUrl: str
       url: fetchUrl,
     };
     if (!isPaywallBoilerplate(candidate)) {
-      return { ...polishArticleForSite(candidate), url: resolvedUrl };
+      return finalizeArticle(candidate, resolvedUrl, fetchUrl);
     }
   }
 
   const fromMeta = buildArticleFromMetadata(preprocessed, fetchUrl);
   if (fromMeta && !isPaywallBoilerplate(fromMeta)) {
-    return { ...polishArticleForSite({ ...fromMeta, url: fetchUrl }), url: resolvedUrl };
+    return finalizeArticle({ ...fromMeta, url: fetchUrl }, resolvedUrl, fetchUrl);
   }
 
   const article = parseWithReadability(preprocessed, fetchUrl);
   if (article && !isPaywallBoilerplate(article)) {
-    return { ...polishArticleForSite({ ...article, url: fetchUrl }), url: resolvedUrl };
+    return finalizeArticle({ ...article, url: fetchUrl }, resolvedUrl, fetchUrl);
   }
 
   return null;

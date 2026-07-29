@@ -40,6 +40,14 @@ function ShieldIcon({ className = 'w-5 h-5' }: { className?: string }) {
   );
 }
 
+function BanIcon({ className = 'w-5 h-5' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 105.636 5.636a9 9 0 0012.728 12.728zM5.636 5.636l12.728 12.728" />
+    </svg>
+  );
+}
+
 const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Read It All',
@@ -55,6 +63,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/privacy', label: 'Privacy Policy', icon: ShieldIcon },
       { href: '/terms', label: 'Terms and Conditions', icon: ShieldIcon },
       { href: '/report', label: 'Report Content', icon: ShieldIcon },
+      { href: '/unsupported-sites', label: 'Unsupported Sites', icon: BanIcon },
     ],
   },
 ];

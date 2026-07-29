@@ -36,6 +36,7 @@ import { news18Rule } from './news18.com';
 import { hartpunktRule } from './hartpunkt.de';
 import { apNewsRule } from './apnews.com';
 import { nytimesRule } from './nytimes.com';
+import { politicoRule } from './politico.eu';
 
 export const SITE_RULES: Record<string, SiteRule> = {
   'bbc.com': bbcRule,
@@ -77,6 +78,7 @@ export const SITE_RULES: Record<string, SiteRule> = {
   'hartpunkt.de': hartpunktRule,
   'apnews.com': apNewsRule,
   'nytimes.com': nytimesRule,
+  'politico.eu': politicoRule,
 };
 
 function getSiteRule(url: string): SiteRule | null {

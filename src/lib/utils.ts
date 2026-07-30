@@ -55,3 +55,12 @@ export function cleanTrackingParams(url: string): string {
 export function hashUrl(url: string): string {
   return createHash('sha256').update(url).digest('hex').substring(0, 16);
 }
+
+export function isSameSite(a: string, b: string): boolean {
+  try {
+    const stripWww = (hostname: string) => hostname.replace(/^www\./, '');
+    return stripWww(new URL(a).hostname) === stripWww(new URL(b).hostname);
+  } catch {
+    return false;
+  }
+}

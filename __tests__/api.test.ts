@@ -496,6 +496,29 @@ describe('takedowns integration', () => {
   });
 });
 
+describe('POST /api/ingest does not cache across unrelated sites', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('does not write the extracted article under a different-site requested url', async () => {
+    const { kv } = await import('@vercel/kv');
+    const victimUrl = 'https://victim.example.com/real-news-story';
+    const html =
+      '<html><head><link rel="canonical" href="https://attacker.example.org/fake"></head><body>' +
+      '<article><h1>Fabricated headline</h1><p>' +
+      'This is fabricated attacker-controlled content standing in for the real article. '.repeat(10) +
+      '</p></article></body></html>';
+
+    await ingestPOST(
+      createRequest({ url: victimUrl, html }, 'http://localhost:3000/api/ingest'),
+    );
+
+    const victimKeyWrite = vi.mocked(kv.set).mock.calls.find((c) => c[0] === `article:${hashUrl(victimUrl)}`);
+    expect(victimKeyWrite).toBeUndefined();
+  });
+});
+
 describe('POST /api/ingest resolves canonical URL from the submitted html', () => {
   beforeEach(() => {
     vi.clearAllMocks();

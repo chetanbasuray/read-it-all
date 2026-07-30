@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { extractArticle } from '@/lib/scraper';
 import { polishArticleForSite } from '@/lib/site-rules';
 import { setCachedArticle, getCachedArticle, getArticleViews } from '@/lib/redis';
-import { hashUrl, cleanTrackingParams } from '@/lib/utils';
+import { hashUrl, cleanTrackingParams, isSameSite } from '@/lib/utils';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { getTakedown } from '@/lib/takedowns';
@@ -142,8 +142,10 @@ export async function POST(request: NextRequest) {
 
     await setCachedArticle(article.url, article);
     // also cache under the requested (pre-canonical-resolution) url, so a repeat
-    // visit via the same wrapped/redirect link hits cache instead of re-ingesting
-    if (article.url !== canonicalUrl) {
+    // visit via the same wrapped/redirect link hits cache instead of re-ingesting;
+    // restricted to the same site, since a caller controls both url and the html's
+    // own canonical tag and could otherwise plant content under an unrelated url
+    if (article.url !== canonicalUrl && isSameSite(article.url, canonicalUrl)) {
       await setCachedArticle(canonicalUrl, article);
     }
 

@@ -64,3 +64,22 @@ export function isSameSite(a: string, b: string): boolean {
     return false;
   }
 }
+
+// the app's own instructions tell users to select-all + copy from DevTools'
+// Application > Cookies panel, which produces a tab-separated table (one row
+// per cookie: name, value, domain, path, ...), not a `name=value; ...` Cookie
+// header -- passing that raw table straight into a Cookie header throws
+// (control characters aren't valid header bytes), so every fetch attempt
+// silently fails; rebuild a real Cookie header from that table shape here
+export function normalizeCookieInput(input: string): string {
+  const trimmed = input.trim();
+  if (!trimmed || !trimmed.includes('\t')) return trimmed;
+
+  const pairs = trimmed
+    .split('\n')
+    .map((line) => line.split('\t'))
+    .filter(([name, value]) => name && value)
+    .map(([name, value]) => `${name.trim()}=${value.trim()}`);
+
+  return pairs.length > 0 ? pairs.join('; ') : trimmed;
+}

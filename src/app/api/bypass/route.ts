@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { scrapeArticle, ScrapeError, TakedownError } from '@/lib/scraper';
 import { getCachedArticle, setCachedArticle } from '@/lib/redis';
-import { hashUrl, cleanTrackingParams } from '@/lib/utils';
+import { hashUrl, cleanTrackingParams, normalizeCookieInput } from '@/lib/utils';
 import { normalizeAndValidateUrl } from '@/lib/urlSafety';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 
@@ -26,7 +26,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { url, cookies } = body as { url?: string; cookies?: string };
+    const { url, cookies: rawCookies } = body as { url?: string; cookies?: string };
+    const cookies = rawCookies ? normalizeCookieInput(rawCookies) : rawCookies;
 
     if (!url || typeof url !== 'string') {
       return NextResponse.json({ error: 'URL is required' }, { status: 400 });

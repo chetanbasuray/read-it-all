@@ -30,12 +30,21 @@ function stripPreferredSourceCta($: cheerio.CheerioAPI): void {
     .remove();
 }
 
+// an in-article video embed; when the page was captured via the
+// browser-render fallback tier, video.js has already initialized and its
+// control-bar accessibility text ("Video Player is loading.", "Current
+// Time", ...) is real DOM text that Readability picks up as prose
+function stripVideoEmbeds($: cheerio.CheerioAPI): void {
+  $('.vjs-wrapper').remove();
+}
+
 function preprocessDwHtml(html: string): string {
   const $ = cheerio.load(html);
   stripKicker($);
   dedupePublishDate($);
   stripFeedbackWidget($);
   stripPreferredSourceCta($);
+  stripVideoEmbeds($);
   return $.html();
 }
 

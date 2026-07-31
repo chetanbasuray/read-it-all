@@ -757,6 +757,27 @@ describe('preprocessHtmlForSite for dw.com', () => {
     expect(result).toContain('Real headline');
     expect(result).toContain('Real paragraph one.');
   });
+
+  it('strips an in-article video embed, including a video.js-initialized player', () => {
+    const html =
+      '<h1>Real headline</h1>' +
+      '<p>Real paragraph one.</p>' +
+      '<div class="vjs-wrapper embed big">' +
+      '<h2 aria-label="Embedded video — Some clip" class="headline">Some clip</h2>' +
+      '<div class="dw-player video-js vjs-paused">' +
+      '<div class="vjs-loading-spinner"><span class="vjs-control-text">Video Player is loading.</span></div>' +
+      '<div class="vjs-control-bar"><span class="vjs-control-text">Current Time</span> 0:00 ' +
+      '<span class="vjs-control-text">Duration</span> 0:00 <span class="vjs-control-text">Remaining Time</span> 0:00</div>' +
+      '</div></div>' +
+      '<p>Real paragraph two.</p>';
+
+    const result = preprocessHtmlForSite(url, html);
+
+    expect(result).not.toContain('Video Player is loading');
+    expect(result).not.toContain('vjs-wrapper');
+    expect(result).toContain('Real paragraph one.');
+    expect(result).toContain('Real paragraph two.');
+  });
 });
 
 describe('preprocessHtmlForSite for rte.ie', () => {

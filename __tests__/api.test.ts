@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ScrapeError, TakedownError, extractFirstImage, extractAuthor, extractArticle, isPaywallBoilerplate, parseWithReadability } from '@/lib/scraper';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { validateUrl, safeFetch } from '@/lib/urlSafety';
-import { hashUrl } from '@/lib/utils';
+import { hashUrl, normalizeCookieInput } from '@/lib/utils';
 
 vi.hoisted(() => {
   process.env.KV_URL = 'https://dummy-redis.example.com';
@@ -744,6 +744,23 @@ describe('safeFetch', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(safeFetch('https://example.com/loop')).rejects.toThrow('Too many redirects');
+  });
+});
+
+describe('normalizeCookieInput', () => {
+  it('leaves an already-valid Cookie header untouched', () => {
+    expect(normalizeCookieInput('sid=abc123; auth=xyz789')).toBe('sid=abc123; auth=xyz789');
+  });
+
+  it('rebuilds a Cookie header from a pasted DevTools Application > Cookies table', () => {
+    const pasted = 'datadome\tabc123\t.example.com\t/\t2027-01-01\t10\t\tcheck\tLax\t\tMedium\n' +
+      'connect.sid\txyz789\twww.example.com\t/\tSession\t9\tcheck\t\t\t\tMedium';
+    expect(normalizeCookieInput(pasted)).toBe('datadome=abc123; connect.sid=xyz789');
+  });
+
+  it('skips a row missing a value and keeps the rest', () => {
+    const pasted = 'broken\t\t.example.com\t/\n' + 'sid\tabc123\t.example.com\t/';
+    expect(normalizeCookieInput(pasted)).toBe('sid=abc123');
   });
 });
 

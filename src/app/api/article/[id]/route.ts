@@ -5,10 +5,11 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const article = await getArticleById(params.id);
+    const { id } = await params;
+    const article = await getArticleById(id);
 
     if (!article) {
       return NextResponse.json(
@@ -17,10 +18,10 @@ export async function GET(
       );
     }
 
-    const views = await getArticleViews(params.id);
+    const views = await getArticleViews(id);
 
     return NextResponse.json({
-      id: params.id,
+      id,
       ...article,
       cached: true,
       views,
@@ -34,10 +35,11 @@ export async function GET(
 
 export async function POST(
   _request: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const views = await incrementArticleViews(params.id);
+    const { id } = await params;
+    const views = await incrementArticleViews(id);
     return NextResponse.json({ views });
   } catch (error) {
     const message =

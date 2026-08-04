@@ -1,6 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: ['playwright', 'playwright-core', '@sparticuz/chromium', 'jsdom'],
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = [...(config.externals || []), 'playwright', 'playwright-core', '@sparticuz/chromium', 'jsdom'];
+    }
+    return config;
+  },
 };
 
 export default nextConfig;

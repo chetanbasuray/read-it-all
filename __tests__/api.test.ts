@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { NextRequest } from 'next/server';
 import { ScrapeError, TakedownError, extractFirstImage, extractAuthor, extractArticle, isPaywallBoilerplate, parseWithReadability } from '@/lib/scraper';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { validateUrl, safeFetch } from '@/lib/urlSafety';
@@ -53,8 +54,8 @@ const { GET: domainStatsGET } = await import('@/app/api/domain-stats/route');
 const { scrapeArticle } = await import('@/lib/scraper');
 const { getTakedown } = await import('@/lib/takedowns');
 
-function createRequest(body: unknown, url = 'http://localhost:3000/api/bypass', headers: Record<string, string> = {}): Request {
-  return new Request(url, {
+function createRequest(body: unknown, url = 'http://localhost:3000/api/bypass', headers: Record<string, string> = {}): NextRequest {
+  return new NextRequest(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...headers },
     body: JSON.stringify(body),
@@ -588,13 +589,13 @@ describe('GET /api/domain-stats', () => {
   });
 
   it('returns 401 without a token', async () => {
-    const response = await domainStatsGET(new Request(STATS_URL));
+    const response = await domainStatsGET(new NextRequest(STATS_URL));
     expect(response.status).toBe(401);
   });
 
   it('returns 401 with the wrong token', async () => {
     const response = await domainStatsGET(
-      new Request(STATS_URL, { headers: { Authorization: 'Bearer wrong' } }),
+      new NextRequest(STATS_URL, { headers: { Authorization: 'Bearer wrong' } }),
     );
     expect(response.status).toBe(401);
   });
@@ -605,7 +606,7 @@ describe('GET /api/domain-stats', () => {
     vi.mocked(kv.hgetall).mockResolvedValueOnce({ total: 5, 'direct-fetch': 5 });
 
     const response = await domainStatsGET(
-      new Request(STATS_URL, { headers: { Authorization: 'Bearer test-token' } }),
+      new NextRequest(STATS_URL, { headers: { Authorization: 'Bearer test-token' } }),
     );
     const data = await response.json();
 
@@ -1060,13 +1061,13 @@ describe('generateMetadata (reader/[id])', () => {
       url: 'https://example.com/article',
     });
 
-    const metadata = await generateMetadata({ params: { id: 'abc123' } });
+    const metadata = await generateMetadata({ params: Promise.resolve({ id: 'abc123' }) });
 
     expect(metadata.title).toBe('Big News Story');
     expect(metadata.description).toBe('A short summary');
     expect(metadata.openGraph?.title).toBe('Big News Story');
     expect(metadata.openGraph?.images).toEqual([{ url: 'https://example.com/hero.jpg' }]);
-    expect(metadata.twitter?.card).toBe('summary_large_image');
+    expect((metadata.twitter as { card?: string } | null)?.card).toBe('summary_large_image');
   });
 
   it('falls back to a generic title when the article is missing', async () => {
@@ -1075,7 +1076,7 @@ describe('generateMetadata (reader/[id])', () => {
 
     vi.mocked(kv.get).mockResolvedValueOnce(null);
 
-    const metadata = await generateMetadata({ params: { id: 'missing' } });
+    const metadata = await generateMetadata({ params: Promise.resolve({ id: 'missing' }) });
     expect(metadata.title).toBe('Article not found - Read It All');
   });
 });
@@ -1195,7 +1196,7 @@ describe('ReaderPage recovery from expired content', () => {
       .mockResolvedValueOnce({ url: 'https://example.com/expired-article' });
 
     await expect(
-      ReaderPageModule.default({ params: { id: 'expired-id' } }),
+      ReaderPageModule.default({ params: Promise.resolve({ id: 'expired-id' }) }),
     ).rejects.toThrow('NEXT_REDIRECT:/reader/bypass?url=https%3A%2F%2Fexample.com%2Fexpired-article');
   });
 
@@ -1205,7 +1206,7 @@ describe('ReaderPage recovery from expired content', () => {
 
     vi.mocked(kv.get).mockResolvedValue(null);
 
-    const result = await ReaderPageModule.default({ params: { id: 'totally-unknown' } });
+    const result = await ReaderPageModule.default({ params: Promise.resolve({ id: 'totally-unknown' }) });
     expect(result).toBeTruthy();
   });
 });

@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { NextRequest } from 'next/server';
 import { isAuthorizedAdminRequest } from '@/lib/adminAuth';
 
-function requestWith(token?: string): Request {
+function requestWith(token?: string): NextRequest {
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
-  return new Request('http://localhost:3000/api/whatever', { headers });
+  return new NextRequest('http://localhost:3000/api/whatever', { headers });
 }
 
 describe('isAuthorizedAdminRequest', () => {

@@ -14,10 +14,9 @@ const getArticle = cache(getArticleById);
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }): Promise<Metadata> {
-  const { id } = await params;
-  const article = await getArticle(id);
+  const article = await getArticle(params.id);
   if (!article) {
     return { title: 'Article not found - Read It All' };
   }
@@ -46,13 +45,12 @@ export async function generateMetadata({
 export default async function ReaderPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }) {
-  const { id } = await params;
-  const article = await getArticle(id);
+  const article = await getArticle(params.id);
 
   if (!article) {
-    const url = await getUrlForId(id);
+    const url = await getUrlForId(params.id);
     if (url) {
       redirect(`/reader/bypass?url=${encodeURIComponent(url)}`);
     }
@@ -69,7 +67,7 @@ export default async function ReaderPage({
     );
   }
 
-  const views = await getArticleViews(id);
+  const views = await getArticleViews(params.id);
 
-  return <Reader article={{ id, ...article, cached: true, views }} />;
+  return <Reader article={{ id: params.id, ...article, cached: true, views }} />;
 }

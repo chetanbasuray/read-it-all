@@ -1,6 +1,10 @@
 import * as cheerio from 'cheerio';
+import { regex } from 'shorol';
 import type { ArticleData } from '../scraper';
 import type { SiteRule } from './types';
+
+const CAMEL_CASE_BOUNDARY_REGEX = regex().group((b) => b.range('a', 'z')).group((b) => b.range('A', 'Z')).toRegExp('g');
+const UPDATED_SPLIT_REGEX = regex().whitespace().zeroOrMore().literal('Updated:').toRegExp('i');
 
 // Google's "Preferred Sources" opt-in button is client-JS-injected (only
 // present once the browser-render fallback tier runs), sits as the last
@@ -28,8 +32,8 @@ function preprocessIgnHtml(html: string): string {
 // boundary back into words, then drop everything from "Updated" onward
 function cleanByline(byline: string | null): string | null {
   if (!byline) return byline;
-  const spaced = byline.replace(/([a-z])([A-Z])/g, '$1 $2');
-  return spaced.split(/\s*Updated:/i)[0].trim() || byline;
+  const spaced = byline.replace(CAMEL_CASE_BOUNDARY_REGEX, '$1 $2');
+  return spaced.split(UPDATED_SPLIT_REGEX)[0].trim() || byline;
 }
 
 function polishIgnArticle(article: ArticleData): ArticleData {

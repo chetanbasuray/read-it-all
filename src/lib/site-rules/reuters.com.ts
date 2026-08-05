@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { regex } from 'shorol';
 import type { ArticleData } from '../scraper';
 import type { SiteRule } from './types';
 
@@ -7,10 +8,9 @@ import type { SiteRule } from './types';
 // Built from char codes rather than literal characters or \u escapes so this
 // file never contains an actual invisible character (unreadable/undiffable).
 const INVISIBLE_CHAR_CODES = [0x200b, 0x200c, 0x200d, 0x2060, 0xfeff];
-const INVISIBLE_CHARS = new RegExp(
-  `[${INVISIBLE_CHAR_CODES.map((code) => String.fromCharCode(code)).join('')}]`,
-  'g',
-);
+const INVISIBLE_CHARS = regex()
+  .anyOf(INVISIBLE_CHAR_CODES.map((code) => String.fromCharCode(code)))
+  .toRegExp('g');
 
 function stripInvisibleChars(text: string): string {
   return text.replace(INVISIBLE_CHARS, '');

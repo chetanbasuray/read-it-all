@@ -1,5 +1,5 @@
 import data from './data.json';
-import { cleanTrackingParams } from '../utils';
+import { cleanTrackingParams, WWW_PREFIX_REGEX } from '../utils';
 
 // git-tracked instead of Redis on purpose: a takedown must outlive a cache
 // flush or a Redis outage, and each entry going through a commit/PR is itself
@@ -31,7 +31,7 @@ export function matchTakedown(takedowns: TakedownsData, url: string): TakedownEn
 
   // a domain-level takedown covers subdomains too ("all content from their site"),
   // unlike a URL-level one, which is about one specific article
-  const hostname = parsed.hostname.replace(/^www\./, '');
+  const hostname = parsed.hostname.replace(WWW_PREFIX_REGEX, '');
   for (const [domain, entry] of Object.entries(takedowns.domains)) {
     if (hostname === domain || hostname.endsWith(`.${domain}`)) {
       return entry;

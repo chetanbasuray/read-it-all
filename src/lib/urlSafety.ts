@@ -2,6 +2,14 @@ import { lookup } from 'dns/promises';
 import { isIP } from 'net';
 import { regex } from 'shorol';
 
+const IPV6_BRACKETS_REGEX = regex()
+  .start()
+  .literal('[')
+  .group((b) => b.any().zeroOrMore())
+  .literal(']')
+  .end()
+  .toRegExp();
+
 function ipInCIDR(ip: string, cidr: string): boolean {
   const [rangeNet, bitsStr] = cidr.split('/');
   const bits = parseInt(bitsStr, 10);
@@ -59,7 +67,7 @@ export async function validateUrl(rawUrl: string): Promise<void> {
 
   // URL.hostname keeps the brackets around an IPv6 literal (e.g. "[::1]"),
   // which fails isIP() and dns.lookup() alike and would otherwise skip every check below.
-  const hostname = parsed.hostname.replace(/^\[(.*)\]$/, '$1');
+  const hostname = parsed.hostname.replace(IPV6_BRACKETS_REGEX, '$1');
 
   if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
     throw new Error(`URL resolves to a loopback address: ${hostname}`);

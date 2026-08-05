@@ -194,5 +194,10 @@
     "domain": "politico.eu",
     "url": "https://www.politico.eu/article/france-german-deal-eu-auto-industry-made-in-europe/",
     "status": "known-good"
+  },
+  {
+    "domain": "g1.globo.com",
+    "url": "https://g1.globo.com/mundo/noticia/2026/08/05/entenda-se-a-embaixadora-do-brasil-nos-eua-pode-ser-deportada.ghtml",
+    "status": "known-good"
   }
 ]

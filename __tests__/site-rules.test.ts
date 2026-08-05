@@ -1349,3 +1349,41 @@ describe('preprocessHtmlForSite for politico.eu', () => {
     expect(preprocessHtmlForSite(url, html)).toContain('Clean paragraph.');
   });
 });
+
+describe('preprocessHtmlForSite for g1.globo.com', () => {
+  const url = 'https://g1.globo.com/mundo/noticia/example.ghtml';
+
+  it('lifts the byline into a meta author tag and strips in-article video widgets', () => {
+    const html =
+      '<html><head></head><body><p class="content-publication-data__from" title="Redação g1"> Por <a>Redação g1</a> </p>' +
+      '<p>Real paragraph one.</p>' +
+      '<div class="content-intertitle"><h2>VÍDEOS: agora no g1</h2></div>' +
+      '<div class="cxm-block-video content-media"><span>Assista ao vídeo</span></div>' +
+      '<p>Real paragraph two.</p></body></html>';
+
+    const result = preprocessHtmlForSite(url, html);
+
+    expect(result).toContain('<meta name="author" content="Redação g1">');
+    expect(result).not.toContain('VÍDEOS: agora no g1');
+    expect(result).not.toContain('Assista ao vídeo');
+    expect(result).toContain('Real paragraph one.');
+    expect(result).toContain('Real paragraph two.');
+  });
+
+  it('does not overwrite an existing meta author tag', () => {
+    const html =
+      '<html><head><meta name="author" content="Existing Author"></head><body>' +
+      '<p class="content-publication-data__from"> Por <a>Redação g1</a> </p>' +
+      '<p>Real paragraph one.</p></body></html>';
+
+    const result = preprocessHtmlForSite(url, html);
+
+    expect(result).toContain('content="Existing Author"');
+    expect(result).not.toContain('content="Redação g1"');
+  });
+
+  it('leaves content untouched when none of the known junk is present', () => {
+    const html = '<p>Clean paragraph.</p>';
+    expect(preprocessHtmlForSite(url, html)).toContain('Clean paragraph.');
+  });
+});

@@ -1,6 +1,9 @@
 import * as cheerio from 'cheerio';
+import { regex } from 'shorol';
 import type { ArticleData } from '../scraper';
 import type { SiteRule } from './types';
+
+const BY_PREFIX_REGEX = regex().start().literal('By').whitespace().oneOrMore().toRegExp('i');
 
 // the real byline lives in a nested <span class="byline">, but the
 // generic extractAuthor selector ([class*="byline" i]) matches the
@@ -27,7 +30,7 @@ function preprocessToiIsraelHtml(html: string): string {
 // reader UI already prepends its own "By " when displaying article.byline
 function stripBylinePrefix(byline: string | null): string | null {
   if (!byline) return byline;
-  return byline.replace(/^By\s+/i, '').trim() || byline;
+  return byline.replace(BY_PREFIX_REGEX, '').trim() || byline;
 }
 
 function polishToiIsraelArticle(article: ArticleData): ArticleData {

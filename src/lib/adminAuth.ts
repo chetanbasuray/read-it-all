@@ -1,5 +1,8 @@
 import { timingSafeEqual } from 'crypto';
 import type { NextRequest } from 'next/server';
+import { regex } from 'shorol';
+
+const BEARER_PREFIX_REGEX = regex().start().literal('Bearer').whitespace().oneOrMore().toRegExp('i');
 
 function tokenMatches(provided: string, expected: string): boolean {
   const a = Buffer.from(provided);
@@ -16,6 +19,6 @@ export function isAuthorizedAdminRequest(request: NextRequest): boolean {
   );
   if (validTokens.length === 0) return false;
 
-  const provided = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? '';
+  const provided = request.headers.get('authorization')?.replace(BEARER_PREFIX_REGEX, '') ?? '';
   return validTokens.some((token) => tokenMatches(provided, token));
 }

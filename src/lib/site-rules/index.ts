@@ -1,5 +1,6 @@
 import type { ArticleData } from '../scraper';
 import type { SiteRule } from './types';
+import { WWW_PREFIX_REGEX } from '../utils';
 import { bbcRule } from './bbc.com';
 import { reutersRule } from './reuters.com';
 import { guardianRule } from './theguardian.com';
@@ -85,7 +86,7 @@ export const SITE_RULES: Record<string, SiteRule> = {
 
 function getSiteRule(url: string): SiteRule | null {
   try {
-    const hostname = new URL(url).hostname.replace(/^www\./, '');
+    const hostname = new URL(url).hostname.replace(WWW_PREFIX_REGEX, '');
     return SITE_RULES[hostname] ?? null;
   } catch {
     return null;

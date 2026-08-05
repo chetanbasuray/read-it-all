@@ -1,4 +1,5 @@
 import { kv } from '@vercel/kv';
+import { WWW_PREFIX_REGEX } from './utils';
 
 export type ScrapeTier =
   | 'direct-fetch'
@@ -25,7 +26,7 @@ const DOMAINS_SET_KEY = 'domain-stats:domains';
 
 function getDomain(url: string): string | null {
   try {
-    return new URL(url).hostname.replace(/^www\./, '');
+    return new URL(url).hostname.replace(WWW_PREFIX_REGEX, '');
   } catch {
     return null;
   }

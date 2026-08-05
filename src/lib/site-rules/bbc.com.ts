@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { regex } from 'shorol';
 import type { SiteRule } from './types';
 
 // BBC wraps a full no-JS navigation menu in a <noscript> block. Per the HTML5 spec,
@@ -7,7 +8,14 @@ import type { SiteRule } from './types';
 // it has to be stripped as a raw string before any HTML parsing happens. Without
 // this, buildArticleFromMetadata's noscript-based fallback (which assumes any long
 // noscript block is likely an article body) grabs this nav menu as "the article."
-const NOSCRIPT_NAV_PATTERN = /<noscript>(?:(?!<\/noscript>)[\s\S])*?NoJsNavigation[\s\S]*?<\/noscript>/gi;
+const NOSCRIPT_NAV_PATTERN = regex()
+  .literal('<noscript>')
+  .nonCapture((b) => b.negativeLookahead((l) => l.literal('</noscript>')).any())
+  .zeroOrMore().lazy()
+  .literal('NoJsNavigation')
+  .any().zeroOrMore().lazy()
+  .literal('</noscript>')
+  .toRegExp('gis');
 
 // BBC embeds several non-article widgets directly inside the article body markup:
 // an inline video player placeholder (no video without JS, just a "Watch: ..."

@@ -1,5 +1,8 @@
 import * as cheerio from 'cheerio';
+import { regex } from 'shorol';
 import type { SiteRule } from './types';
+
+const PREFERRED_SOURCE_CTA_PATTERN = regex().literal('Preferred Source on Google').toRegExp();
 
 // the category breadcrumb (e.g. "Politik Deutschland") sits right before
 // the headline; the plain "kicker" class is reused on every teaser card on
@@ -26,7 +29,7 @@ function stripFeedbackWidget($: cheerio.CheerioAPI): void {
 // with no distinguishing class, matched by its stable text instead
 function stripPreferredSourceCta($: cheerio.CheerioAPI): void {
   $('p')
-    .filter((_, el) => /Preferred Source on Google/.test($(el).text()))
+    .filter((_, el) => PREFERRED_SOURCE_CTA_PATTERN.test($(el).text()))
     .remove();
 }
 

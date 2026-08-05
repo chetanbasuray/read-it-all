@@ -1,6 +1,12 @@
 import * as cheerio from 'cheerio';
+import { regex, type Builder } from 'shorol';
 import type { ArticleData } from '../scraper';
 import type { SiteRule } from './types';
+
+const weekdayAlternation = (b: Builder) =>
+  b.literal('Mon').orLiteral('Tue').orLiteral('Wed').orLiteral('Thu').orLiteral('Fri').orLiteral('Sat').orLiteral('Sun');
+const WEEKDAY_BOUNDARY_REGEX = regex().group((b) => b.range('a', 'z')).group(weekdayAlternation).toRegExp();
+const WEEKDAY_SPLIT_REGEX = regex().whitespace().oneOrMore().nonCapture(weekdayAlternation).toRegExp();
 
 // a "TOPICS:" tag-list sits as its own <ul> right before the real story
 // paragraphs inside the same story-content container; its class is a hashed
@@ -23,8 +29,8 @@ function preprocessNationalDeskHtml(html: string): string {
 // the boundary back into words, then drop everything from the weekday onward
 function cleanByline(byline: string | null): string | null {
   if (!byline) return byline;
-  const spaced = byline.replace(/([a-z])(Mon|Tue|Wed|Thu|Fri|Sat|Sun)/, '$1 $2');
-  return spaced.split(/\s+(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)/)[0].trim() || byline;
+  const spaced = byline.replace(WEEKDAY_BOUNDARY_REGEX, '$1 $2');
+  return spaced.split(WEEKDAY_SPLIT_REGEX)[0].trim() || byline;
 }
 
 function polishNationalDeskArticle(article: ArticleData): ArticleData {

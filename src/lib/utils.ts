@@ -1,4 +1,14 @@
 import { createHash } from 'crypto';
+import { regex } from 'shorol';
+
+// shared across every place that strips a leading "www." from a hostname
+export const WWW_PREFIX_REGEX = regex().start().literal('www.').toRegExp();
+
+// shared across every place that strips HTML tags down to plain text
+export const HTML_TAG_REGEX = regex().literal('<').noneOf('>').zeroOrMore().literal('>').toRegExp('g');
+
+// shared across every place that collapses runs of whitespace to a single space
+export const WHITESPACE_RUN_REGEX = regex().whitespace().oneOrMore().toRegExp('g');
 
 const TRACKING_PARAMS = new Set([
   'utm_source',
@@ -58,7 +68,7 @@ export function hashUrl(url: string): string {
 
 export function isSameSite(a: string, b: string): boolean {
   try {
-    const stripWww = (hostname: string) => hostname.replace(/^www\./, '');
+    const stripWww = (hostname: string) => hostname.replace(WWW_PREFIX_REGEX, '');
     return stripWww(new URL(a).hostname) === stripWww(new URL(b).hostname);
   } catch {
     return false;

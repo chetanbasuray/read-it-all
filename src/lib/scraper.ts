@@ -1,11 +1,13 @@
 import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
 import * as cheerio from 'cheerio';
+import { regex } from 'shorol';
 import { sanitizeHtml } from './sanitize';
 import { safeFetch } from './urlSafety';
 import { preprocessHtmlForSite, polishArticleForSite } from './site-rules';
 import { getTakedown, type TakedownEntry } from './takedowns';
 import { recordDomainOutcome, type ScrapeTier } from './domainStats';
+import { HTML_TAG_REGEX, WHITESPACE_RUN_REGEX } from './utils';
 
 async function dynamicRenderPage(url: string, cookies?: string): Promise<string> {
   const { renderPage } = await import('./browser');
@@ -99,11 +101,13 @@ export function isPaywallBoilerplate(article: Pick<ArticleData, 'content' | 'tex
 // newline/tab inside a string value instead of an escaped \n, which is
 // invalid JSON; those control characters are only ever significant inside
 // string literals, so collapsing them everywhere is a safe recovery parse
+const CONTROL_CHAR_RUN_REGEX = regex().anyOf(['\r', '\n', '\t']).oneOrMore().toRegExp('g');
+
 function parseJsonLd(raw: string): any {
   try {
     return JSON.parse(raw);
   } catch {
-    return JSON.parse(raw.replace(/[\r\n\t]+/g, ' '));
+    return JSON.parse(raw.replace(CONTROL_CHAR_RUN_REGEX, ' '));
   }
 }
 
@@ -116,7 +120,7 @@ function authorNameFromJsonLd(author: unknown): string | null {
   const names = people
     .map((p) =>
       p && typeof p === 'object' && 'name' in p
-        ? String((p as { name: unknown }).name).replace(/\s+/g, ' ').trim()
+        ? String((p as { name: unknown }).name).replace(WHITESPACE_RUN_REGEX, ' ').trim()
         : null,
     )
     .filter((n): n is string => !!n);
@@ -204,6 +208,22 @@ export function extractCanonicalUrl(html: string, baseUrl: string): string | nul
   }
 }
 
+const CDN_CGI_IMAGE_PATH_REGEX = regex()
+  .literal('/cdn-cgi/image/')
+  .noneOf('/').oneOrMore()
+  .literal('/')
+  .group((b) => b.any().oneOrMore())
+  .end()
+  .toRegExp();
+
+const RESIZE_SUFFIX_REGEX = regex()
+  .literal('-')
+  .digit().oneOrMore()
+  .literal('x')
+  .digit().oneOrMore()
+  .lookahead((b) => b.literal('.').word().oneOrMore().end())
+  .toRegExp();
+
 // resolves what an image URL actually points at, unwrapping a Cloudflare-style
 // resize proxy (/cdn-cgi/image/<params>/<realPath>) and a WordPress-style
 // "-WIDTHxHEIGHT" resize suffix, so two differently-sized renditions of the
@@ -211,10 +231,10 @@ export function extractCanonicalUrl(html: string, baseUrl: string): string | nul
 function coreImageIdentity(rawUrl: string, baseUrl: string): string | null {
   try {
     const u = new URL(rawUrl, baseUrl);
-    const cdnCgiMatch = u.pathname.match(/\/cdn-cgi\/image\/[^/]+\/(.+)$/);
+    const cdnCgiMatch = u.pathname.match(CDN_CGI_IMAGE_PATH_REGEX);
     const pathname = cdnCgiMatch ? `/${cdnCgiMatch[1]}` : u.pathname;
     const filename = pathname.split('/').pop() || '';
-    return filename.replace(/-\d+x\d+(?=\.\w+$)/, '');
+    return filename.replace(RESIZE_SUFFIX_REGEX, '');
   } catch {
     return null;
   }
@@ -274,10 +294,17 @@ function extractStructuredAuthor(html: string): string | null {
   return author || extractJsonLdAuthorName(html);
 }
 
+const BRACKETED_PLACEHOLDER_REGEX = regex()
+  .literal('[')
+  .group((b) => b.range('a', 'z').or((o) => o.range('A', 'Z')))
+  .oneOrMore()
+  .literal(']')
+  .toRegExp();
+
 // a bracketed placeholder (e.g. AP's "Updated [hour]:[minute] [AMPM]") means the
 // candidate is an unrendered client-side timestamp widget, not a byline
 function isRealByline(text: string | null | undefined): text is string {
-  return !!text && !/\[[a-zA-Z]+\]/.test(text);
+  return !!text && !BRACKETED_PLACEHOLDER_REGEX.test(text);
 }
 
 export function extractAuthor(html: string): string | null {
@@ -289,7 +316,7 @@ export function extractAuthor(html: string): string | null {
     .load(html)('[class*="byline" i], [class*="author" i], [class*="by-line" i]')
     .first()
     .text()
-    .replace(/\s+/g, ' ')
+    .replace(WHITESPACE_RUN_REGEX, ' ')
     .trim();
   return isRealByline(byline) ? byline : null;
 }
@@ -490,7 +517,7 @@ export function parseWithReadability(html: string, url: string): ArticleData | n
         content: sanitizeHtml(article.content),
         textContent: article.textContent || '',
         excerpt: article.excerpt || article.textContent?.substring(0, 200) || '',
-        byline: rawByline ? rawByline.replace(/\s+/g, ' ').trim() : null,
+        byline: rawByline ? rawByline.replace(WHITESPACE_RUN_REGEX, ' ').trim() : null,
         image: extractFirstImage(html, url),
         url,
       };
@@ -501,14 +528,28 @@ export function parseWithReadability(html: string, url: string): ArticleData | n
   return null;
 }
 
+const WORD_LIKE_TOKEN_REGEX = regex()
+  .start()
+  .nonCapture((b) => b.range('A', 'Z').or((o) => o.range('a', 'z')))
+  .nonCapture((b) =>
+    b
+      .range('A', 'Z')
+      .or((o) => o.range('a', 'z'))
+      .or((o) => o.anyOf(["'", '’', '-'])),
+  )
+  .zeroOrMore()
+  .anyOf(['.', ',', ';', ':', '!', '?']).optional()
+  .end()
+  .toRegExp();
+
 // a <noscript> block long enough to pass the metadata tier's length check can
 // still be CSS/attribute soup rather than prose (a lazy-load plugin's <style>
 // tag, or a lazy-loaded <img>'s long src/srcset with no spaces); real article
 // text is overwhelmingly plain words, so reject text that isn't
 function looksLikeProse(text: string): boolean {
-  const words = text.trim().split(/\s+/);
+  const words = text.trim().split(WHITESPACE_RUN_REGEX);
   if (words.length < 20) return false;
-  const wordLike = words.filter((w) => /^[A-Za-z][A-Za-z'’-]*[.,;:!?]?$/.test(w));
+  const wordLike = words.filter((w) => WORD_LIKE_TOKEN_REGEX.test(w));
   return wordLike.length / words.length > 0.6;
 }
 
@@ -523,13 +564,13 @@ function buildArticleFromMetadata(
     // page could smuggle live markup (e.g. an onerror handler) straight into
     // stored content; sanitize here just like the JSON-LD and Readability tiers do
     const content = sanitizeHtml(rawContent);
-    const plainText = content.replace(/<[^>]*>/g, '').trim();
+    const plainText = content.replace(HTML_TAG_REGEX, '').trim();
     if (plainText.length < 200 || !looksLikeProse(plainText)) return null;
     return {
       title,
       content,
-      textContent: content.replace(/<[^>]*>/g, ''),
-      excerpt: content.replace(/<[^>]*>/g, '').substring(0, 200),
+      textContent: content.replace(HTML_TAG_REGEX, ''),
+      excerpt: content.replace(HTML_TAG_REGEX, '').substring(0, 200),
       byline: extractAuthor(html),
       image: extractFirstImage(html, url),
       url,

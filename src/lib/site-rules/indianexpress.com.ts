@@ -1,6 +1,16 @@
 import * as cheerio from 'cheerio';
+import { regex } from 'shorol';
 import type { ArticleData } from '../scraper';
 import type { SiteRule } from './types';
+
+const WRITTEN_BY_PREFIX_REGEX = regex().start().literal('Written by:').whitespace().zeroOrMore().toRegExp('i');
+const MIN_READ_SPLIT_REGEX = regex()
+  .digit().oneOrMore()
+  .whitespace().zeroOrMore()
+  .literal('min')
+  .whitespace().zeroOrMore()
+  .literal('read')
+  .toRegExp('i');
 
 // a breadcrumb nav's last item echoes the full headline via aria-current="page"
 // (a "duplicate headline" leak); a live-blog/latest-news sidebar column and a
@@ -23,7 +33,7 @@ function preprocessIndianExpressHtml(html: string): string {
 // "N min read" onward, and the "Written by:" prefix the reader UI doesn't need
 function cleanByline(byline: string | null): string | null {
   if (!byline) return byline;
-  return byline.replace(/^Written by:\s*/i, '').split(/\d+\s*min\s*read/i)[0].trim() || byline;
+  return byline.replace(WRITTEN_BY_PREFIX_REGEX, '').split(MIN_READ_SPLIT_REGEX)[0].trim() || byline;
 }
 
 function polishIndianExpressArticle(article: ArticleData): ArticleData {

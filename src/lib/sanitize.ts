@@ -1,4 +1,5 @@
 import DOMPurify from 'isomorphic-dompurify';
+import { regex } from 'shorol';
 
 const ALLOWED_TAGS = [
   'p', 'a', 'img', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
@@ -15,12 +16,22 @@ const ALLOWED_ATTR = [
 // screen-reader-only labels (visually-hidden/sr-only, a standard accessibility
 // convention across many sites, not specific to any one domain) are invisible to
 // sighted readers via CSS we never apply, so left in they show up as literal text
-const SR_ONLY_CLASS_PATTERN = /(^|\s)(visually-hidden|sr-only|screen-reader-text|a11y-hidden)(\s|$)/i;
+const SR_ONLY_CLASS_PATTERN = regex()
+  .group((b) => b.start().or((o) => o.whitespace()))
+  .group((b) =>
+    b
+      .literal('visually-hidden')
+      .orLiteral('sr-only')
+      .orLiteral('screen-reader-text')
+      .orLiteral('a11y-hidden'),
+  )
+  .group((b) => b.whitespace().or((o) => o.end()))
+  .toRegExp('i');
 
 // OneTrust is one of the most widely deployed cookie-consent platforms on the
 // web; its markup is a fixed-id widget (onetrust-consent-sdk and friends),
 // never article content, regardless of which site embeds it
-const ONETRUST_ID_PATTERN = /^onetrust/i;
+const ONETRUST_ID_PATTERN = regex().start().literal('onetrust').toRegExp('i');
 
 DOMPurify.addHook('uponSanitizeElement', (node) => {
   if (node.nodeType !== 1) return;

@@ -1,6 +1,13 @@
 import * as cheerio from 'cheerio';
+import { regex } from 'shorol';
 import type { ArticleData } from '../scraper';
 import type { SiteRule } from './types';
+
+const FOLLOW_TOOLTIP_PATTERN = regex()
+  .literal('Posts from this ')
+  .group((b) => b.literal('topic').orLiteral('author'))
+  .literal(' will be added')
+  .toRegExp();
 
 // "follow this topic/author" tag chips appear above the headline (breadcrumb)
 // and after the article (footer tags), marked by a stable id pattern. The
@@ -19,7 +26,7 @@ function stripFollowTopics($: cheerio.CheerioAPI): void {
 // extracted; anchored on its fixed copy since it has no stable class/id
 function stripFollowTooltips($: cheerio.CheerioAPI): void {
   $('p')
-    .filter((_, el) => /Posts from this (topic|author) will be added/.test($(el).text()))
+    .filter((_, el) => FOLLOW_TOOLTIP_PATTERN.test($(el).text()))
     .each((_, el) => {
       $(el).parent().remove();
     });

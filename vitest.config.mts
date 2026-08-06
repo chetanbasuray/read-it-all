@@ -2,8 +2,11 @@ import { defineConfig } from 'vitest/config';
 import path from 'path';
 
 export default defineConfig({
-  esbuild: {
-    jsx: 'automatic',
+  // vite 8 transforms with oxc, which honours tsconfig's "jsx": "preserve" and
+  // leaves raw JSX that import analysis can't parse; next needs that tsconfig
+  // value, so the override belongs here instead
+  oxc: {
+    jsx: { runtime: 'automatic' },
   },
   test: {
     environment: 'node',
@@ -11,10 +14,10 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(import.meta.dirname, './src'),
       // plain node_modules/react has no cache() export; next build resolves
       // 'react' to this bundle for that reason, so tests need to match
-      react: path.resolve(__dirname, './node_modules/next/dist/compiled/react'),
+      react: path.resolve(import.meta.dirname, './node_modules/next/dist/compiled/react'),
     },
   },
 });

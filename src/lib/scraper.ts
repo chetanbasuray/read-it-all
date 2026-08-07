@@ -9,7 +9,7 @@ import { getTakedown, type TakedownEntry } from './takedowns';
 import { recordDomainOutcome, type ScrapeTier } from './domainStats';
 import { getFeedRule } from './feeds';
 import { parseFeed, findEntryForUrl } from './feeds/parse';
-import { HTML_TAG_REGEX, WHITESPACE_RUN_REGEX } from './utils';
+import { HTML_TAG_REGEX, WHITESPACE_RUN_REGEX, htmlToPlainText } from './utils';
 
 async function dynamicRenderPage(url: string, cookies?: string): Promise<string> {
   const { renderPage } = await import('./browser');
@@ -512,12 +512,12 @@ export function articleFromFeedEntry(
 
   // feed HTML is remote and untrusted exactly like a scraped page
   const content = sanitizeHtml(entry.content);
-  const plainText = content.replace(HTML_TAG_REGEX, '').trim();
+  const plainText = htmlToPlainText(content);
   if (plainText.length < MIN_FEED_TEXT_LENGTH) return null;
 
   // a feed that repeats its <description> inside content:encoded is a teaser
   // dressed as a body, and would otherwise beat a perfectly good later tier
-  const summaryLength = (entry.summary ?? '').replace(HTML_TAG_REGEX, '').trim().length;
+  const summaryLength = htmlToPlainText(entry.summary ?? '').length;
   if (summaryLength > 0 && plainText.length < summaryLength * FEED_OVER_SUMMARY_RATIO) return null;
 
   if (!looksLikeProse(plainText)) return null;
@@ -578,11 +578,16 @@ export function parseWithReadability(html: string, url: string): ArticleData | n
         (isRealByline(article.byline) ? article.byline : null) ||
         extractAuthor(html) ||
         null;
+      // derived from the sanitized HTML rather than Readability's own
+      // textContent, which welds block elements together and keeps the source
+      // indentation; this is also the exact markup the reader renders
+      const content = sanitizeHtml(article.content);
+      const plainText = htmlToPlainText(content);
       return {
         title: article.title || extractTitle(html) || 'Untitled',
-        content: sanitizeHtml(article.content),
-        textContent: article.textContent || '',
-        excerpt: article.excerpt || article.textContent?.substring(0, 200) || '',
+        content,
+        textContent: plainText,
+        excerpt: article.excerpt?.trim() || plainText.substring(0, 200),
         byline: rawByline ? rawByline.replace(WHITESPACE_RUN_REGEX, ' ').trim() : null,
         image: extractFirstImage(html, url),
         url,
@@ -630,13 +635,13 @@ function buildArticleFromMetadata(
     // page could smuggle live markup (e.g. an onerror handler) straight into
     // stored content; sanitize here just like the JSON-LD and Readability tiers do
     const content = sanitizeHtml(rawContent);
-    const plainText = content.replace(HTML_TAG_REGEX, '').trim();
+    const plainText = htmlToPlainText(content);
     if (plainText.length < 200 || !looksLikeProse(plainText)) return null;
     return {
       title,
       content,
-      textContent: content.replace(HTML_TAG_REGEX, ''),
-      excerpt: content.replace(HTML_TAG_REGEX, '').substring(0, 200),
+      textContent: plainText,
+      excerpt: plainText.substring(0, 200),
       byline: extractAuthor(html),
       image: extractFirstImage(html, url),
       url,

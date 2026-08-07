@@ -46,7 +46,7 @@
     "domain": "timesofisrael.com",
     "url": "https://www.timesofisrael.com/government-okays-shin-bet-to-fight-crime-in-arab-society-sparking-rights-concerns/",
     "status": "known-hard",
-    "note": "Inconsistent bot-challenge (a Cloudflare-Turnstile-style 'Just a quick check…' interstitial) blocks some requests but not others."
+    "note": "Inconsistent bot-challenge (a Cloudflare-Turnstile-style 'Just a quick check\u2026' interstitial) blocks some requests but not others."
   },
   {
     "domain": "thehindu.com",
@@ -198,6 +198,16 @@
   {
     "domain": "g1.globo.com",
     "url": "https://g1.globo.com/mundo/noticia/2026/08/05/entenda-se-a-embaixadora-do-brasil-nos-eua-pode-ser-deportada.ghtml",
+    "status": "known-good"
+  },
+  {
+    "domain": "aninews.in",
+    "url": "https://aninews.in/news/national/general-news/114-rafale-jet-deal-france-submits-detailed-proposal-for-rs-325-lakh-crore-aircraft-deal-to-india20260806182413/",
+    "status": "known-good"
+  },
+  {
+    "domain": "ecfr.eu",
+    "url": "https://ecfr.eu/article/trust-the-numbers-germans-are-open-to-a-more-hawkish-china-policy",
     "status": "known-good"
   }
 ]

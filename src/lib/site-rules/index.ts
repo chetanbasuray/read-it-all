@@ -39,6 +39,7 @@ import { apNewsRule } from './apnews.com';
 import { nytimesRule } from './nytimes.com';
 import { politicoRule } from './politico.eu';
 import { globoRule } from './globo.com';
+import { aniNewsRule } from './aninews.in';
 
 export const SITE_RULES: Record<string, SiteRule> = {
   'bbc.com': bbcRule,
@@ -82,6 +83,7 @@ export const SITE_RULES: Record<string, SiteRule> = {
   'nytimes.com': nytimesRule,
   'politico.eu': politicoRule,
   'g1.globo.com': globoRule,
+  'aninews.in': aniNewsRule,
 };
 
 function getSiteRule(url: string): SiteRule | null {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { extractArticle } from '@/lib/scraper';
 import { polishArticleForSite } from '@/lib/site-rules';
 import { setCachedArticle, getCachedArticle, getArticleViews } from '@/lib/redis';
-import { hashUrl, cleanTrackingParams, isSameSite, HTML_TAG_REGEX } from '@/lib/utils';
+import { hashUrl, cleanTrackingParams, isSameSite, htmlToPlainText } from '@/lib/utils';
 import { sanitizeHtml } from '@/lib/sanitize';
 import { checkRateLimit, getClientIp } from '@/lib/rateLimit';
 import { getTakedown } from '@/lib/takedowns';
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
         title: title || 'Untitled',
         content,
         textContent: textContent || '',
-        excerpt: excerpt || (textContent || content.replace(HTML_TAG_REGEX, '')).substring(0, 200),
+        excerpt: excerpt || (textContent || htmlToPlainText(content)).substring(0, 200),
         byline: byline || null,
         image: image || null,
         url: canonicalUrl,

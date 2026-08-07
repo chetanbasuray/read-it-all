@@ -10,6 +10,13 @@ export const HTML_TAG_REGEX = regex().literal('<').noneOf('>').zeroOrMore().lite
 // shared across every place that collapses runs of whitespace to a single space
 export const WHITESPACE_RUN_REGEX = regex().whitespace().oneOrMore().toRegExp('g');
 
+// dropping tags outright welds block elements together ("<p>One.</p><p>Two</p>"
+// becomes "One.Two"), which corrupts excerpts and, worse, makes looksLikeProse
+// see "One.Two" as one non-word token and under-count real prose
+export function htmlToPlainText(html: string): string {
+  return html.replace(HTML_TAG_REGEX, ' ').replace(WHITESPACE_RUN_REGEX, ' ').trim();
+}
+
 const TRACKING_PARAMS = new Set([
   'utm_source',
   'utm_medium',

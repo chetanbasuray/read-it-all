@@ -1387,3 +1387,30 @@ describe('preprocessHtmlForSite for g1.globo.com', () => {
     expect(preprocessHtmlForSite(url, html)).toContain('Clean paragraph.');
   });
 });
+
+describe('aninews.in', () => {
+  const polish = (byline: string | null) =>
+    SITE_RULES['aninews.in'].polishArticle!(fakeArticle({ byline })).byline;
+
+  it('strips the By prefix and the trailing separator pipe', () => {
+    expect(polish('By Ajit Dubey |')).toBe('Ajit Dubey');
+  });
+
+  it.each([
+    ['By Ajit Dubey', 'Ajit Dubey'],
+    ['Ajit Dubey |', 'Ajit Dubey'],
+    ['by  Ajit Dubey  |  ', 'Ajit Dubey'],
+    ['Ajit Dubey', 'Ajit Dubey'],
+  ])('normalises %s', (input, expected) => {
+    expect(polish(input)).toBe(expected);
+  });
+
+  it('leaves a null byline alone and never blanks a byline out', () => {
+    expect(polish(null)).toBeNull();
+    expect(polish('By |')).toBe('By |');
+  });
+
+  it('does not strip a name that merely starts with the letters "by"', () => {
+    expect(polish('Byron Smith')).toBe('Byron Smith');
+  });
+});

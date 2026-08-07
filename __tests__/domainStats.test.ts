@@ -63,6 +63,7 @@ describe('getAllDomainStats', () => {
           'direct-fetch': 7,
           warmup: 0,
           amp: 0,
+          feed: 0,
           'browser-render': 0,
           'google-cache': 0,
           wayback: 0,

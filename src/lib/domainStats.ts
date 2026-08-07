@@ -5,6 +5,7 @@ export type ScrapeTier =
   | 'direct-fetch'
   | 'warmup'
   | 'amp'
+  | 'feed'
   | 'browser-render'
   | 'google-cache'
   | 'wayback'
@@ -14,6 +15,7 @@ const ALL_TIERS: ScrapeTier[] = [
   'direct-fetch',
   'warmup',
   'amp',
+  'feed',
   'browser-render',
   'google-cache',
   'wayback',

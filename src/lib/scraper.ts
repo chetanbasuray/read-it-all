@@ -7,6 +7,8 @@ import { safeFetch } from './urlSafety';
 import { preprocessHtmlForSite, polishArticleForSite } from './site-rules';
 import { getTakedown, type TakedownEntry } from './takedowns';
 import { recordDomainOutcome, type ScrapeTier } from './domainStats';
+import { getFeedRule } from './feeds';
+import { parseFeed, findEntryForUrl } from './feeds/parse';
 import { HTML_TAG_REGEX, WHITESPACE_RUN_REGEX } from './utils';
 
 async function dynamicRenderPage(url: string, cookies?: string): Promise<string> {
@@ -496,6 +498,70 @@ async function fetchFromWayback(url: string): Promise<string | null> {
   return null;
 }
 
+// a feed body is only worth using if it is the article rather than the teaser
+// most publishers ship; these thresholds were set against measured feeds, where
+// real bodies ran to thousands of characters and teasers under a kilobyte
+const MIN_FEED_TEXT_LENGTH = 1200;
+const FEED_OVER_SUMMARY_RATIO = 2;
+
+export function articleFromFeedEntry(
+  entry: { content: string | null; summary: string | null; title: string | null; author: string | null },
+  url: string,
+): ArticleData | null {
+  if (!entry.content) return null;
+
+  // feed HTML is remote and untrusted exactly like a scraped page
+  const content = sanitizeHtml(entry.content);
+  const plainText = content.replace(HTML_TAG_REGEX, '').trim();
+  if (plainText.length < MIN_FEED_TEXT_LENGTH) return null;
+
+  // a feed that repeats its <description> inside content:encoded is a teaser
+  // dressed as a body, and would otherwise beat a perfectly good later tier
+  const summaryLength = (entry.summary ?? '').replace(HTML_TAG_REGEX, '').trim().length;
+  if (summaryLength > 0 && plainText.length < summaryLength * FEED_OVER_SUMMARY_RATIO) return null;
+
+  if (!looksLikeProse(plainText)) return null;
+
+  // no og:image on a feed entry, so the lead image has to come from the body
+  // itself or the reader loses the hero every other tier provides
+  const firstImage = cheerio.load(content)('img').first().attr('src') ?? null;
+
+  return {
+    title: entry.title || 'Untitled',
+    content,
+    textContent: plainText,
+    excerpt: plainText.substring(0, 200),
+    byline: entry.author ? entry.author.replace(WHITESPACE_RUN_REGEX, ' ').trim() || null : null,
+    image: firstImage,
+    url,
+  };
+}
+
+async function fetchArticleFromFeed(url: string): Promise<ArticleData | null> {
+  const rule = getFeedRule(url);
+  if (!rule) return null;
+
+  for (const feedUrl of rule.feedUrls) {
+    try {
+      const response = await safeFetch(feedUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ReadItAll/1.0)' },
+      });
+      if (!response.ok) continue;
+
+      const entry = findEntryForUrl(parseFeed(await response.text()), url);
+      if (!entry) continue;
+
+      // same finalize step every other tier goes through, so a feed-sourced
+      // article is indistinguishable downstream and still gets its site rules
+      const article = articleFromFeedEntry(entry, url);
+      if (article) return finalizeArticle(article, url, url);
+    } catch {
+      // feed unreachable or malformed; the remaining tiers still apply
+    }
+  }
+  return null;
+}
+
 export function parseWithReadability(html: string, url: string): ArticleData | null {
   try {
     const dom = new JSDOM(html, { url });
@@ -773,6 +839,12 @@ async function attemptScrape(
   } else {
     errors.push('Direct fetch succeeded but no article body found in HTML');
   }
+
+  // placed after the cheap direct tiers and before the expensive render: a site
+  // serving us fine keeps full fidelity and its site rules, while a blocked one
+  // gets an unblockable path without paying for Playwright first
+  const feedArticle = await fetchArticleFromFeed(url);
+  if (feedArticle) return { article: feedArticle, tier: 'feed' };
 
   try {
     errors.push('Attempting browser rendering (Playwright/Browserless)...');

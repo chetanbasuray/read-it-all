@@ -209,5 +209,25 @@
     "domain": "ecfr.eu",
     "url": "https://ecfr.eu/article/trust-the-numbers-germans-are-open-to-a-more-hawkish-china-policy",
     "status": "known-good"
+  },
+  {
+    "domain": "politico.com",
+    "url": "https://www.politico.com/news/magazine/2026/08/08/europe-us-fertility-immigration-01029122",
+    "status": "known-good"
+  },
+  {
+    "domain": "defencesecurityasia.com",
+    "url": "https://defencesecurityasia.com/en/india-agni-4-nuclear-missile-test-china-indo-pacific/",
+    "status": "known-good"
+  },
+  {
+    "domain": "ndtv.com",
+    "url": "https://www.ndtv.com/india-news/amca-fcas-india-has-initiated-efforts-to-join-6th-generation-fighter-jet-programme-centre-11881535",
+    "status": "known-good"
+  },
+  {
+    "domain": "theprint.in",
+    "url": "https://theprint.in/defence/and-its-official-india-in-talks-with-france-to-join-6th-gen-fighter-programme-fcas/3009124/",
+    "status": "known-good"
   }
 ]

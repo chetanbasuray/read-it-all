@@ -1414,3 +1414,45 @@ describe('aninews.in', () => {
     expect(polish('Byron Smith')).toBe('Byron Smith');
   });
 });
+
+describe('politico.com', () => {
+  const preprocess = (html: string) => SITE_RULES['politico.com'].preprocessHtml!(html);
+
+  const page = `<html><body><article>
+    <h1>The West’s Demographic Math No Longer Adds Up</h1>
+    <p class="mb-4 mt-2 text-sm">An intergenerational bargain is falling apart.</p>
+    <figure><img src="https://x/hero.jpg"></figure>
+    <p class="mb-2.5 border-b border-gray-200">A hopscotch court sits empty. | Michael Robinson Chávez for POLITICO</p>
+    <span class="text-xs">By Marc Felix Serrao</span>
+    <time datetime="2026-08-08">08/08/2026 07:00 AM EDT</time>
+    <p class="font-text italic">Marc Felix Serrao is a reporter for Axel Springer Global Reporters Network.</p>
+    <p>VILARDEVOS, Spain — the real article starts here.</p>
+    <p>The Axel Springer Global Reporters Network harnesses the resources of the newsrooms.</p>
+  </article></body></html>`;
+
+  const out = preprocess(page);
+
+  it.each([
+    ['the dek', 'intergenerational bargain'],
+    ['the lead caption and credit', 'hopscotch court'],
+    ['the repeated byline', 'By Marc Felix Serrao'],
+    ['the timestamp', '07:00 AM EDT'],
+    ['the author bio', 'is a reporter for Axel Springer'],
+    ['the network boilerplate', 'harnesses the resources'],
+  ])('removes %s', (_label, needle) => {
+    expect(out).not.toContain(needle);
+  });
+
+  it('keeps the headline and the real article body', () => {
+    expect(out).toContain('Demographic Math');
+    expect(out).toContain('the real article starts here');
+  });
+
+  it('leaves the lead figure for the duplicate-image strip to handle', () => {
+    expect(out).toContain('hero.jpg');
+  });
+
+  it('is distinct from the politico.eu rule', () => {
+    expect(SITE_RULES['politico.com']).not.toBe(SITE_RULES['politico.eu']);
+  });
+});

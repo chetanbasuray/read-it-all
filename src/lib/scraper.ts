@@ -113,6 +113,38 @@ function parseJsonLd(raw: string): any {
   }
 }
 
+// some publishers double-escape their own entities, shipping "&amp;quot;" where
+// they mean a quote mark, which then renders as literal "&quot;" text.
+// Deliberately not an HTML parse: parsing strips inline tags and silently drops
+// everything after a stray "<", which is a real shape for an articleBody.
+const DOUBLE_ESCAPED_ENTITY_REGEX = regex()
+  .literal('&amp;')
+  .lookahead((b) =>
+    b
+      .nonCapture((n) => n.letter().oneOrMore().or((o) => o.literal('#').digit().oneOrMore()))
+      .literal(';'),
+  )
+  .toRegExp('g');
+
+function decodeDoubleEscapedEntities(text: string): string {
+  return text.replace(DOUBLE_ESCAPED_ENTITY_REGEX, '&');
+}
+
+// a body with no newline anywhere is one unsplittable paragraph, and sentences in
+// it are often already welded ("has said.In its report"); restoring the space is
+// the difference between readable prose and a wall of text
+const WELDED_SENTENCE_REGEX = regex()
+  .group((b) => b.range('a', 'z').or((o) => o.anyOf(['.', '"', "'"])))
+  .literal('.')
+  .group((b) => b.range('A', 'Z'))
+  .toRegExp('g');
+
+function normalizeArticleBody(articleBody: string): string {
+  const decoded = decodeDoubleEscapedEntities(articleBody);
+  if (decoded.includes('\n')) return decoded;
+  return decoded.replace(WELDED_SENTENCE_REGEX, '$1. $2');
+}
+
 // schema.org's "author" is valid as either a single Person/Organization or an
 // array of them (multi-byline articles); a plain `.name` lookup silently
 // returns undefined for the array form, which is common even for single-author pieces
@@ -168,16 +200,18 @@ export function extractFromJsonLd(
           typeof item.articleBody === 'string' &&
           item.articleBody.length > 200
         ) {
+          const body = normalizeArticleBody(item.articleBody);
+          const content = sanitizeHtml(
+            body
+              .split('\n')
+              .filter(Boolean)
+              .map((p: string) => `<p>${p}</p>`)
+              .join(''),
+          );
           return {
             title: item.headline || item.title || 'Untitled',
-            content: sanitizeHtml(
-              item.articleBody
-                .split('\n')
-                .filter(Boolean)
-                .map((p: string) => `<p>${p}</p>`)
-                .join(''),
-            ),
-            textContent: item.articleBody,
+            content,
+            textContent: htmlToPlainText(content),
             byline: authorNameFromJsonLd(item.author),
             image:
               item.image?.url ||
@@ -227,12 +261,23 @@ const RESIZE_SUFFIX_REGEX = regex()
   .toRegExp();
 
 // resolves what an image URL actually points at, unwrapping a Cloudflare-style
-// resize proxy (/cdn-cgi/image/<params>/<realPath>) and a WordPress-style
-// "-WIDTHxHEIGHT" resize suffix, so two differently-sized renditions of the
-// same source photo compare equal
+// resize proxy (/cdn-cgi/image/<params>/<realPath>), a query-param proxy that
+// carries the real image in ?url= (politico's dims4, next/image, imgix, Photon),
+// and a WordPress-style "-WIDTHxHEIGHT" resize suffix, so two differently-sized
+// renditions of the same source photo compare equal
 function coreImageIdentity(rawUrl: string, baseUrl: string): string | null {
   try {
-    const u = new URL(rawUrl, baseUrl);
+    let u = new URL(rawUrl, baseUrl);
+    // the proxy's own path only describes the transform (".../format/webp"), so
+    // without this the hero and its in-body twin compare as "jpg" versus "webp"
+    const proxied = u.searchParams.get('url');
+    if (proxied) {
+      try {
+        u = new URL(proxied, baseUrl);
+      } catch {
+        // not a resolvable inner URL; fall through to the outer one
+      }
+    }
     const cdnCgiMatch = u.pathname.match(CDN_CGI_IMAGE_PATH_REGEX);
     const pathname = cdnCgiMatch ? `/${cdnCgiMatch[1]}` : u.pathname;
     const filename = pathname.split('/').pop() || '';
@@ -274,17 +319,31 @@ export function extractFirstImage(html: string, baseUrl: string): string | null 
   return null;
 }
 
+// publishers append their own name to og:title and <title> with a dash or pipe;
+// og:site_name names the exact suffix, so this needs no per-site list
+function stripSiteNameSuffix(title: string, siteName: string | undefined): string {
+  if (!siteName) return title;
+  for (const separator of [' - ', ' | ', ' – ', ' — ', ' :: ']) {
+    const suffix = `${separator}${siteName}`;
+    if (title.endsWith(suffix)) return title.slice(0, -suffix.length).trim();
+  }
+  return title;
+}
+
 export function extractTitle(html: string): string | null {
   const $ = cheerio.load(html);
+  const siteName = $('meta[property="og:site_name"]').attr('content')?.trim();
+  const clean = (title: string) => stripSiteNameSuffix(title.trim(), siteName);
+
   const ogTitle = $('meta[property="og:title"]').attr('content');
-  if (ogTitle) return ogTitle;
+  if (ogTitle) return clean(ogTitle);
   const twitterTitle = $('meta[name="twitter:title"]').attr('content');
-  if (twitterTitle) return twitterTitle;
+  if (twitterTitle) return clean(twitterTitle);
   const h1 = $('h1').first().text().trim();
-  if (h1) return h1;
+  if (h1) return clean(h1);
   const titleTag = $('title').text().trim();
   if (titleTag && !titleTag.includes('wsj.com') && !titleTag.includes('404') && !titleTag.includes('Error')) {
-    return titleTag;
+    return clean(titleTag);
   }
   return null;
 }
@@ -305,8 +364,13 @@ const BRACKETED_PLACEHOLDER_REGEX = regex()
 
 // a bracketed placeholder (e.g. AP's "Updated [hour]:[minute] [AMPM]") means the
 // candidate is an unrendered client-side timestamp widget, not a byline
+// a CMS account name, not a person; WordPress ships "admin" as the default author
+// and many small publishers never change it
+const PLACEHOLDER_BYLINES = new Set(['admin', 'administrator', 'author', 'user', 'guest']);
+
 function isRealByline(text: string | null | undefined): text is string {
-  return !!text && !BRACKETED_PLACEHOLDER_REGEX.test(text);
+  if (!text || BRACKETED_PLACEHOLDER_REGEX.test(text)) return false;
+  return !PLACEHOLDER_BYLINES.has(text.trim().toLowerCase());
 }
 
 export function extractAuthor(html: string): string | null {
@@ -573,18 +637,20 @@ export function parseWithReadability(html: string, url: string): ArticleData | n
       // the name (a reading-time badge, an "Updated:" timestamp, ...) with the
       // source's original indentation/newlines still between them; a publisher's
       // own structured author data is never wrong this way, so it wins when present
+      // every candidate goes through isRealByline: structured data is the most
+      // trustworthy source but still carries CMS defaults like "admin"
       const rawByline =
-        extractStructuredAuthor(html) ||
-        (isRealByline(article.byline) ? article.byline : null) ||
-        extractAuthor(html) ||
+        [extractStructuredAuthor(html), article.byline, extractAuthor(html)].find(isRealByline) ??
         null;
       // derived from the sanitized HTML rather than Readability's own
       // textContent, which welds block elements together and keeps the source
       // indentation; this is also the exact markup the reader renders
       const content = sanitizeHtml(article.content);
       const plainText = htmlToPlainText(content);
+      // Readability's own title carries the publisher's suffix just like og:title
+      const siteName = cheerio.load(html)('meta[property="og:site_name"]').attr('content')?.trim();
       return {
-        title: article.title || extractTitle(html) || 'Untitled',
+        title: stripSiteNameSuffix(article.title || '', siteName) || extractTitle(html) || 'Untitled',
         content,
         textContent: plainText,
         excerpt: article.excerpt?.trim() || plainText.substring(0, 200),

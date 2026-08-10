@@ -33,3 +33,19 @@ describe('htmlToPlainText', () => {
     expect(htmlToPlainText('multi<b>ple</b>')).toBe('multi ple');
   });
 });
+
+describe('htmlToPlainText entity decoding', () => {
+  it.each([
+    ['<p>Smith &amp; Jones</p>', 'Smith & Jones'],
+    ['<p>&quot;quoted&quot;</p>', '"quoted"'],
+    ['<p>It&#39;s here</p>', "It's here"],
+    ['<p>5 &lt; 7 &gt; 3</p>', '5 < 7 > 3'],
+    ['<p>a&nbsp;b</p>', 'a b'],
+  ])('decodes %s', (input, expected) => {
+    expect(htmlToPlainText(input)).toBe(expected);
+  });
+
+  it('decodes &amp; last so an escaped entity is not over-decoded', () => {
+    expect(htmlToPlainText('<p>&amp;lt;</p>')).toBe('&lt;');
+  });
+});

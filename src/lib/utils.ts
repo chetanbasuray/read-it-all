@@ -10,11 +10,30 @@ export const HTML_TAG_REGEX = regex().literal('<').noneOf('>').zeroOrMore().lite
 // shared across every place that collapses runs of whitespace to a single space
 export const WHITESPACE_RUN_REGEX = regex().whitespace().oneOrMore().toRegExp('g');
 
+// plain text should carry real characters, not markup escapes, or an excerpt
+// reads "Smith &amp; Jones". Done by substitution rather than an HTML parse,
+// which drops everything after a stray "<". &amp; is decoded last so that
+// "&amp;lt;" yields "&lt;" instead of "<".
+const ENTITY_SUBSTITUTIONS: Array<[RegExp, string]> = [
+  [regex().literal('&lt;').toRegExp('g'), '<'],
+  [regex().literal('&gt;').toRegExp('g'), '>'],
+  [regex().literal('&quot;').toRegExp('g'), '"'],
+  [regex().literal('&apos;').toRegExp('g'), "'"],
+  [regex().literal('&#').literal('0').zeroOrMore().literal('39;').toRegExp('g'), "'"],
+  [regex().literal('&nbsp;').toRegExp('g'), ' '],
+  [regex().literal('&amp;').toRegExp('g'), '&'],
+];
+
 // dropping tags outright welds block elements together ("<p>One.</p><p>Two</p>"
 // becomes "One.Two"), which corrupts excerpts and, worse, makes looksLikeProse
 // see "One.Two" as one non-word token and under-count real prose
 export function htmlToPlainText(html: string): string {
-  return html.replace(HTML_TAG_REGEX, ' ').replace(WHITESPACE_RUN_REGEX, ' ').trim();
+  const stripped = html.replace(HTML_TAG_REGEX, ' ');
+  const decoded = ENTITY_SUBSTITUTIONS.reduce(
+    (text, [pattern, replacement]) => text.replace(pattern, replacement),
+    stripped,
+  );
+  return decoded.replace(WHITESPACE_RUN_REGEX, ' ').trim();
 }
 
 const TRACKING_PARAMS = new Set([

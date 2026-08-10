@@ -97,6 +97,48 @@ export async function forceRescrapeArticle(url: string): Promise<ArticleData> {
   }
 }
 
+export interface CachedArticleSummary {
+  id: string;
+  url: string;
+  // null when the content entry has expired but the permanent mapping remains
+  scrapedAt: number | null;
+}
+
+// SCAN rather than KEYS: this runs against the live database, and KEYS blocks it
+// for the duration. The mapping keys are the index because they never expire.
+export async function listCachedArticles(
+  cursor: string,
+  limit: number,
+): Promise<{ cursor: string; items: CachedArticleSummary[] }> {
+  if (!isRedisConfigured) return { cursor: '0', items: [] };
+
+  const [nextCursor, keys] = await kv.scan(cursor, { match: 'mapping:*', count: limit });
+  const ids = keys.map((key) => key.replace('mapping:', ''));
+  if (ids.length === 0) return { cursor: String(nextCursor), items: [] };
+
+  const mappings = await kv.mget<Array<{ url: string } | null>>(...keys);
+  const articles = await kv.mget<Array<CachedArticle | null>>(
+    ...ids.map((id) => `article:${id}`),
+  );
+
+  const items: CachedArticleSummary[] = [];
+  ids.forEach((id, i) => {
+    const url = mappings[i]?.url;
+    if (!url) return;
+    items.push({ id, url, scrapedAt: articles[i]?.scrapedAt ?? null });
+  });
+
+  return { cursor: String(nextCursor), items };
+}
+
+// a sweep must not delete good content because a site happened to be blocking
+// us this minute, which is exactly what forceRescrapeArticle does on failure
+export async function refreshCachedArticle(url: string): Promise<ArticleData> {
+  const fresh = await scrapeArticle(url);
+  await setCachedArticle(url, fresh);
+  return fresh;
+}
+
 export async function evictCachedArticle(url: string): Promise<void> {
   if (!isRedisConfigured) return;
   try {

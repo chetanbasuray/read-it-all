@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "format": "prettier --write .",
     "docs:sync": "doc-sync-check src/lib --docs docs",
-    "check:sites": "tsx scripts/regression-check.ts"
+    "check:sites": "tsx scripts/regression-check.ts",
+    "sweep": "tsx scripts/reextract-sweep.ts"
   },
   "dependencies": {
     "@mozilla/readability": "^0.5.0",

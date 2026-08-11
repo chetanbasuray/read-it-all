@@ -13,6 +13,7 @@
  *   npx tsx scripts/reextract-sweep.ts --older-than 7
  */
 import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { pathToFileURL } from 'url';
 import { regex } from 'shorol';
 import { WWW_PREFIX_REGEX } from '../src/lib/utils';
 
@@ -26,6 +27,19 @@ interface Item {
   id: string;
   url: string;
   scrapedAt: number | null;
+  canonicalUrl: string | null;
+}
+
+// one article is cached under both its requested and canonical url on purpose,
+// so sweeping the raw list scrapes it twice and lets the copies drift
+export function dedupeByArticle(items: Item[]): { kept: Item[]; dropped: number } {
+  const byArticle = new Map<string, Item>();
+  for (const item of items) {
+    const key = item.canonicalUrl ?? item.url;
+    const held = byArticle.get(key);
+    if (!held || (item.url === key && held.url !== key)) byArticle.set(key, item);
+  }
+  return { kept: [...byArticle.values()], dropped: items.length - byArticle.size };
 }
 
 interface Outcome {
@@ -137,6 +151,12 @@ async function main() {
   console.log('Discovering cached articles...');
   let items = await fetchAllItems(auth);
 
+  const deduped = dedupeByArticle(items);
+  if (deduped.dropped > 0) {
+    console.log(`  ${deduped.dropped} entries are second copies of an article already queued`);
+  }
+  items = deduped.kept;
+
   if (onlyDomain) items = items.filter((i) => domainOf(i.url) === onlyDomain);
   if (olderThanDays > 0) {
     const cutoff = Date.now() - olderThanDays * 24 * 60 * 60 * 1000;
@@ -201,7 +221,10 @@ async function main() {
   }
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+// only when run directly: importing this for its helpers must not start a sweep
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}

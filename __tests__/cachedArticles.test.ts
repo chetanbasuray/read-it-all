@@ -26,13 +26,16 @@ describe('listCachedArticles', () => {
     scan.mockResolvedValue(['17', ['mapping:aaa', 'mapping:bbb']]);
     mget
       .mockResolvedValueOnce([{ url: 'https://a.com/1' }, { url: 'https://b.com/2' }])
-      .mockResolvedValueOnce([{ scrapedAt: 111 }, { scrapedAt: 222 }]);
+      .mockResolvedValueOnce([
+        { scrapedAt: 111, url: 'https://a.com/1' },
+        { scrapedAt: 222, url: 'https://b.com/2' },
+      ]);
 
     const page = await listCachedArticles('0', 2);
     expect(page.cursor).toBe('17');
     expect(page.items).toEqual([
-      { id: 'aaa', url: 'https://a.com/1', scrapedAt: 111 },
-      { id: 'bbb', url: 'https://b.com/2', scrapedAt: 222 },
+      { id: 'aaa', url: 'https://a.com/1', scrapedAt: 111, canonicalUrl: 'https://a.com/1' },
+      { id: 'bbb', url: 'https://b.com/2', scrapedAt: 222, canonicalUrl: 'https://b.com/2' },
     ]);
   });
 

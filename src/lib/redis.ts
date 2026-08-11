@@ -102,6 +102,9 @@ export interface CachedArticleSummary {
   url: string;
   // null when the content entry has expired but the permanent mapping remains
   scrapedAt: number | null;
+  // bypass and ingest cache one article under both its requested and canonical
+  // url on purpose, so this is what identifies two entries as the same piece
+  canonicalUrl: string | null;
 }
 
 // SCAN rather than KEYS: this runs against the live database, and KEYS blocks it
@@ -125,7 +128,12 @@ export async function listCachedArticles(
   ids.forEach((id, i) => {
     const url = mappings[i]?.url;
     if (!url) return;
-    items.push({ id, url, scrapedAt: articles[i]?.scrapedAt ?? null });
+    items.push({
+      id,
+      url,
+      scrapedAt: articles[i]?.scrapedAt ?? null,
+      canonicalUrl: articles[i]?.url ?? null,
+    });
   });
 
   return { cursor: String(nextCursor), items };

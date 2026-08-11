@@ -645,7 +645,9 @@ export function parseWithReadability(html: string, url: string): ArticleData | n
       // derived from the sanitized HTML rather than Readability's own
       // textContent, which welds block elements together and keeps the source
       // indentation; this is also the exact markup the reader renders
-      const content = sanitizeHtml(article.content);
+      // publishers double-escape in page markup too, not only in JSON-LD:
+      // moneycontrol ships "S&amp;amp;P 500", which renders as "S&amp;P 500"
+      const content = sanitizeHtml(decodeDoubleEscapedEntities(article.content));
       const plainText = htmlToPlainText(content);
       // Readability's own title carries the publisher's suffix just like og:title
       const siteName = cheerio.load(html)('meta[property="og:site_name"]').attr('content')?.trim();

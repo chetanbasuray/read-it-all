@@ -138,3 +138,17 @@ describe('articleBody decode must never lose text', () => {
     expect(out!.content).toContain("It's here");
   });
 });
+
+describe('double-escaped entities in page markup, not only JSON-LD', () => {
+  it('renders "S&P 500" rather than "S&amp;P 500"', () => {
+    const prose = '<p>Real article prose long enough for readability to take this seriously.</p>'.repeat(6);
+    const html = page(
+      '<meta property="og:title" content="Headline">',
+      `<article><h1>Headline</h1><p>38.1 percent of S&amp;amp;P 500 firms reported.</p>${prose}</article>`,
+    );
+    const article = extractArticle(html, 'https://example.com/a')!;
+    expect(article.content).toContain('S&amp;P 500');
+    expect(article.content).not.toContain('S&amp;amp;P');
+    expect(article.textContent).toContain('S&P 500');
+  });
+});

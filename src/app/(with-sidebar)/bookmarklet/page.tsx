@@ -2,6 +2,10 @@
 
 import { useEffect, useState } from 'react';
 
+// bump when the bookmarklet payload changes: an installed bookmark keeps its old
+// code until the user re-copies it, so the version is sent with every ingest
+const BOOKMARKLET_VERSION = 2;
+
 export default function BookmarkletPage() {
   const [appUrl, setAppUrl] = useState('');
   const [mounted, setMounted] = useState(false);
@@ -21,24 +25,29 @@ export default function BookmarkletPage() {
 
   const bookmarkletCode = `javascript:(function(){
   var A='${appUrl}';
-  function ex(){
+  function head(){
+    var o='',n=document.querySelectorAll('meta,title,link[rel="canonical"],script[type="application/ld+json"]');
+    for(var i=0;i<n.length;i++)o+=n[i].outerHTML;
+    return o;
+  }
+  function body(){
     var e=document.querySelector('article');
-    if(e&&e.textContent.length>200)return e.innerHTML;
+    if(e&&e.textContent.length>200)return e.outerHTML;
     var s=['[role="main"]','.article-content','.story-body','#article-body','.entry-content','.post-content','main'];
-    for(var i=0;i<s.length;i++){e=document.querySelector(s[i]);if(e&&e.textContent.length>200)return e.innerHTML}
+    for(var i=0;i<s.length;i++){e=document.querySelector(s[i]);if(e&&e.textContent.length>200)return e.outerHTML}
     var p='';e=document.querySelectorAll('p');
     for(i=0;i<e.length;i++)p+=e[i].outerHTML;
-    return p.length>200?'<div>'+p+'</div>':null;
+    return p.length>200?'<article>'+p+'</article>':null;
   }
   try{
-    var c=ex();
-    if(c){
-      var t=c.replace(/<[^>]*>/g,'');
-      var d=JSON.stringify({url:location.href,title:document.title,content:c,textContent:t,byline:'',excerpt:t.substring(0,200),image:''});
+    var b=body();
+    if(b){
+      var h='<html><head>'+head()+'</head><body>'+b+'</body></html>';
+      var d=JSON.stringify({url:location.href,html:h,bv:${BOOKMARKLET_VERSION}});
       if(d.length<90000){window.location.href=A+'/reader/accept#'+encodeURIComponent(d);return}
     }
   }catch(e){}
-  fetch(A+'/api/ingest',{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({url:location.href,html:document.documentElement.outerHTML})})
+  fetch(A+'/api/ingest',{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({url:location.href,html:document.documentElement.outerHTML,bv:${BOOKMARKLET_VERSION}})})
   .then(function(){window.location.href=A+'/reader/bypass?url='+encodeURIComponent(location.href)})
   .catch(function(e){alert('Error: '+e.message)})
 })();`;
@@ -53,6 +62,12 @@ export default function BookmarkletPage() {
         <p className="text-gray-500 dark:text-gray-400 mb-6">
           Drag the button below to your bookmarks bar. Then click it on any
           paywalled article page to open it in the reader.
+        </p>
+
+        <p className="text-gray-500 dark:text-gray-400 mb-6 text-sm">
+          Version {BOOKMARKLET_VERSION}. An installed bookmark keeps whichever
+          code it was copied with, so re-drag the button after an update to pick
+          up extraction improvements.
         </p>
 
         <a

@@ -13,6 +13,39 @@ updates:
       npm-dependencies:
         patterns:
           - "*"
+    ignore:
+      # jsdom 30 resolves html-encoding-sniffer 6 and its ESM-only @exodus/bytes,
+      # the ERR_REQUIRE_ESM chain that returned 500 on every dynamic route in #102
+      - dependency-name: "jsdom"
+        update-types: ["version-update:semver-major"]
+      # its nested jsdom crosses to 30 on a minor, so both are held
+      - dependency-name: "isomorphic-dompurify"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # next 16 was reverted in #101 for production-only 500s
+      - dependency-name: "next"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint-config-next"
+        update-types: ["version-update:semver-major"]
+      # react 19, tailwind 4, typescript 7 and eslint 10 each need their own migration
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "tailwindcss"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
+      # types must track the runtime and the libraries they describe, not their own latest
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/jsdom"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"

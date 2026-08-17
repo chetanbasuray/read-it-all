@@ -46,21 +46,21 @@ export function UrlInput({ onSubmit, isLoading }: UrlInputProps) {
             }}
             placeholder="Paste article URL here..."
             disabled={isLoading}
-            className="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 transition-colors text-base"
+            className="w-full rounded-xl bg-white px-4 py-3 text-base text-gray-900 shadow-sm ring-1 ring-gray-200 transition-shadow duration-150 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/70 disabled:opacity-50 dark:bg-white/[0.03] dark:text-gray-100 dark:ring-white/10 dark:placeholder:text-gray-500 dark:focus:ring-blue-400/60"
           />
         </div>
         <button
           type="submit"
           disabled={isLoading}
-          className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium transition-colors text-base whitespace-nowrap flex items-center justify-center gap-2"
+          className="flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-blue-600 px-6 py-3 text-base font-medium text-white shadow-sm transition-colors duration-150 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:ring-offset-2 focus:ring-offset-white disabled:bg-blue-600/50 dark:focus:ring-offset-gray-950"
         >
           {isLoading ? (
             <>
-              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              Reading...
+              <span className="relative flex h-2 w-2" aria-hidden="true">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-60" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
+              </span>
+              Reading
             </>
           ) : (
             'Read Article'
@@ -72,14 +72,14 @@ export function UrlInput({ onSubmit, isLoading }: UrlInputProps) {
         <button
           type="button"
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          className="rounded text-xs text-gray-400 transition-colors hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/60 dark:text-gray-500 dark:hover:text-gray-300"
         >
           {showAdvanced ? 'Hide' : 'Show'} advanced options
         </button>
       </div>
 
       {showAdvanced && (
-        <div className="mt-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
+        <div className="mt-3 rounded-xl bg-gray-50 p-3 ring-1 ring-gray-200 dark:bg-white/[0.03] dark:ring-white/10">
           <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
             Session Cookies (for authenticated sites like WSJ)
           </label>

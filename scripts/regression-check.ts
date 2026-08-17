@@ -17,6 +17,9 @@ interface Site {
   domain: string;
   url: string;
   status: 'known-good' | 'known-hard';
+  // set where the block is on Vercel's IP range: this script runs from a
+  // workstation, so its pass says nothing about what a reader gets
+  blockedInProduction?: boolean;
   note?: string;
 }
 
@@ -70,8 +73,12 @@ async function main() {
       flag = 'REGRESSION';
       regressions += 1;
     } else if (!expectedGood && result.ok) {
-      flag = 'IMPROVED (consider promoting to known-good)';
-      improvements += 1;
+      if (site.blockedInProduction) {
+        flag = 'passes locally, still blocked in production, not a promotion candidate';
+      } else {
+        flag = 'IMPROVED (consider promoting to known-good)';
+        improvements += 1;
+      }
     }
 
     console.log(`[${site.status}] ${site.domain} — ${flag}`);

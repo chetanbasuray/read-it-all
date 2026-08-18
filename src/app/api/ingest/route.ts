@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { extractArticle } from '@/lib/scraper';
+import { extractArticle, isPaywallBoilerplate } from '@/lib/scraper';
 import { polishArticleForSite } from '@/lib/site-rules';
 import { setCachedArticle, getCachedArticle, getArticleViews } from '@/lib/redis';
 import { hashUrl, cleanTrackingParams, isSameSite, htmlToPlainText } from '@/lib/utils';
@@ -123,6 +123,19 @@ export async function POST(request: NextRequest) {
     }
 
     article.content = sanitizeHtml(article.content);
+
+    // the scrape tiers already refuse a subscription wall, but ingest never did,
+    // so a bookmarklet capture of one was stored as though it were the article:
+    // ft.com barrier pages landed under the title "Subscribe to read"
+    if (isPaywallBoilerplate(article)) {
+      return NextResponse.json(
+        {
+          error:
+            'That page was the publisher\'s subscription wall rather than the article. Open the article so its text is on screen, then use the bookmarklet again.',
+        },
+        { status: 422, headers: corsHeaders },
+      );
+    }
 
     const existing = await getCachedArticle(canonicalUrl);
 

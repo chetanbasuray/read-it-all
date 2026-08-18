@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio';
 import { regex } from 'shorol';
 import type { ArticleData } from '../scraper';
+import { WHITESPACE_RUN_REGEX } from '../utils';
 import type { SiteRule } from './types';
 
 const FOLLOW_TOOLTIP_PATTERN = regex()
@@ -46,8 +47,33 @@ function stripFollowPrompt($: cheerio.CheerioAPI): void {
     .remove();
 }
 
+// Verge renders the dek twice, once per responsive layout container, and both are
+// real paragraphs. Class-based matching is unusable here: the wrapper names are
+// hashed per deploy, and the class the copies share is on every body paragraph
+// too. Matching on identical text among the opening paragraphs is narrower.
+const MIN_DEK_LENGTH = 40;
+const OPENING_PARAGRAPHS = 4;
+
+function stripDuplicateDek($: cheerio.CheerioAPI): void {
+  const seen = new Set<string>();
+  $('p')
+    .slice(0, OPENING_PARAGRAPHS)
+    .each((_, el) => {
+      const text = $(el).text().replace(WHITESPACE_RUN_REGEX, ' ').trim();
+      // short repeats are labels rather than a dek, and dropping one could lose
+      // something real; only a substantial exact repeat is treated as the copy
+      if (text.length < MIN_DEK_LENGTH) return;
+      if (seen.has(text)) {
+        $(el).remove();
+        return;
+      }
+      seen.add(text);
+    });
+}
+
 function polishVergeArticle(article: ArticleData): ArticleData {
   const $ = cheerio.load(article.content);
+  stripDuplicateDek($);
   stripFollowTooltips($);
   stripFollowTopics($);
   stripLayoutRail($);

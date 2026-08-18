@@ -1456,3 +1456,38 @@ describe('politico.com', () => {
     expect(SITE_RULES['politico.com']).not.toBe(SITE_RULES['politico.eu']);
   });
 });
+
+describe('theverge.com duplicate dek', () => {
+  const polish = (content: string) =>
+    SITE_RULES['theverge.com'].polishArticle!(fakeArticle({ content })).content;
+
+  const dek = 'The company says the new model reasons better and hallucinates far less often.';
+
+  it('drops the second copy of a dek repeated across layout containers', () => {
+    const out = polish(`<p>${dek}</p><p>${dek}</p><p>Real opening paragraph of the story.</p>`);
+    expect(out.match(new RegExp('hallucinates', 'g'))?.length).toBe(1);
+    expect(out).toContain('Real opening paragraph');
+  });
+
+  it('ignores whitespace differences between the two copies', () => {
+    const out = polish(`<p>${dek}</p><p>  ${dek.replace(' says', '\n says')}  </p>`);
+    expect(out.match(new RegExp('hallucinates', 'g'))?.length).toBe(1);
+  });
+
+  it('never reaches past the opening paragraphs, so a later repeat is left alone', () => {
+    const filler = '<p>Some distinct opening prose here that is long enough to count.</p>';
+    const out = polish(`<p>${dek}</p>${filler}${filler}${filler}<p>${dek}</p>`);
+    expect(out.match(new RegExp('hallucinates', 'g'))?.length).toBe(2);
+  });
+
+  it('leaves short repeated labels alone, since dropping one could lose real content', () => {
+    const out = polish('<p>Updated</p><p>Updated</p><p>Body text follows here.</p>');
+    expect(out.match(/Updated/g)?.length).toBe(2);
+  });
+
+  it('does not touch an article whose opening paragraphs are all distinct', () => {
+    const out = polish(`<p>${dek}</p><p>A different sentence entirely, also reasonably long.</p>`);
+    expect(out).toContain('hallucinates');
+    expect(out).toContain('A different sentence');
+  });
+});

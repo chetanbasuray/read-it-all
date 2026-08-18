@@ -54,11 +54,21 @@ function BypassInner() {
 
       let res = await fetch(`/api/article/${id}`);
       if (!res.ok) {
-        await fetch('/api/bypass', {
+        // the scrape response already explains any failure, naming the publisher
+        // and what was tried; polling past it would replace that with a guess
+        const started = await fetch('/api/bypass', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url: u }),
         });
+        if (!started.ok) {
+          const body = (await started.json().catch(() => ({}))) as { error?: string };
+          if (!cancelled) {
+            setError(body.error ?? 'That article could not be retrieved.');
+            setLoading(false);
+          }
+          return;
+        }
       }
 
       for (let i = 0; i < 30; i++) {
@@ -78,7 +88,7 @@ function BypassInner() {
         await new Promise((r) => setTimeout(r, 1000));
       }
       if (!cancelled) {
-        setError('Article not found. The ingest request may have failed.');
+        setError('That article never reached the cache. Try the bookmarklet on the open article, or paste the link again.');
         setLoading(false);
       }
     }

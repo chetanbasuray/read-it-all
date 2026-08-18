@@ -60,6 +60,25 @@ export interface DomainStats {
   successRate: number;
 }
 
+// how a failure message can say something true about this publisher rather than
+// boilerplate: null when nothing has ever been recorded for it
+export async function getDomainSuccessRate(
+  url: string,
+): Promise<{ total: number; successRate: number } | null> {
+  if (!isRedisConfigured) return null;
+  const domain = getDomain(url);
+  if (!domain) return null;
+  try {
+    const hash = (await kv.hgetall<Record<string, number>>(getDomainStatsKey(domain))) ?? {};
+    const total = hash.total ?? 0;
+    if (total === 0) return null;
+    const failed = hash.failed ?? 0;
+    return { total, successRate: Number(((total - failed) / total).toFixed(3)) };
+  } catch {
+    return null;
+  }
+}
+
 // sorted by request volume: the issue this backs is specifically about
 // surfacing "frequently requested but poorly supported" domains
 export async function getAllDomainStats(): Promise<DomainStats[]> {

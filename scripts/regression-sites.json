@@ -231,5 +231,10 @@
     "domain": "theprint.in",
     "url": "https://theprint.in/defence/and-its-official-india-in-talks-with-france-to-join-6th-gen-fighter-programme-fcas/3009124/",
     "status": "known-good"
+  },
+  {
+    "domain": "theverge.com",
+    "url": "https://www.theverge.com/tech/981326/apple-airpods-with-cameras-demo-video-leak",
+    "status": "known-good"
   }
 ]

@@ -6,10 +6,10 @@ import { sanitizeHtml } from './sanitize';
 import { safeFetch } from './urlSafety';
 import { preprocessHtmlForSite, polishArticleForSite } from './site-rules';
 import { getTakedown, type TakedownEntry } from './takedowns';
-import { recordDomainOutcome, type ScrapeTier } from './domainStats';
+import { recordDomainOutcome, getDomainSuccessRate, type ScrapeTier } from './domainStats';
 import { getFeedRule } from './feeds';
 import { parseFeed, findEntryForUrl } from './feeds/parse';
-import { HTML_TAG_REGEX, WHITESPACE_RUN_REGEX, htmlToPlainText } from './utils';
+import { HTML_TAG_REGEX, WHITESPACE_RUN_REGEX, WWW_PREFIX_REGEX, htmlToPlainText } from './utils';
 
 async function dynamicRenderPage(url: string, cookies?: string): Promise<string> {
   const { renderPage } = await import('./browser');
@@ -951,19 +951,38 @@ async function attemptScrape(
     errors.push('Wayback Machine: no snapshot available or rate-limited');
   }
 
-  if (allBlocked) {
-    throw new ScrapeError(
-      'This site is not one we can access well yet, we are working on improving support for it. ' +
-      'In the meantime, try a browser extension like "Bypass Paywalls," or check Google News / Apple News for this article.',
-      errors,
-    );
+  throw new ScrapeError(await unreachableMessage(url, allBlocked), errors);
+}
+
+// names the publisher and the sources actually tried, rather than apologising in
+// the abstract. The history line only claims what the stats have recorded, since
+// archive coverage is per-url and a publisher can start working at any time.
+export async function unreachableMessage(url: string, blocked: boolean): Promise<string> {
+  let domain = 'this site';
+  try {
+    domain = new URL(url).hostname.replace(WWW_PREFIX_REGEX, '');
+  } catch {
+    // keep the generic noun rather than failing to explain anything
   }
 
-  throw new ScrapeError(
-    'We could not extract the full article from this page yet, we are working on improving support for sites like this. ' +
-    'Try opening the original URL directly in your browser.',
-    errors,
-  );
+  const opening = blocked
+    ? `We could not reach ${domain} for this article.`
+    : `We reached ${domain} but could not find the article text on the page.`;
+  const tried =
+    ' We tried the publisher directly, its AMP version, Google Cache and the Wayback Machine.' +
+    ' None of them returned the text.';
+
+  const stats = await getDomainSuccessRate(url);
+  let history = '';
+  if (stats && stats.successRate === 0) {
+    history =
+      ` We have not yet successfully read anything from ${domain}.` +
+      ` If you subscribe, you can paste your session cookies under advanced options to read your own copy.`;
+  } else if (stats && stats.successRate > 0) {
+    history = ` ${domain} usually works here, so this may be temporary. Try again shortly.`;
+  }
+
+  return opening + tried + history;
 }
 
 export async function scrapeArticle(url: string, cookies?: string): Promise<ArticleData> {

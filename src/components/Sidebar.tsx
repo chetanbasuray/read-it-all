@@ -92,10 +92,10 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
                   key={item.href}
                   href={item.href}
                   onClick={onNavigate}
-                  className={`flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-sm transition-colors ${
+                  className={`relative flex items-center gap-2.5 rounded-lg py-1.5 pl-3 pr-2 text-sm transition-colors duration-150 before:absolute before:left-0 before:top-1/2 before:h-4 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:transition-colors ${
                     active
-                      ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium'
-                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-900'
+                      ? 'bg-gray-100 font-medium text-gray-900 before:bg-blue-600 dark:bg-white/[0.06] dark:text-gray-50 dark:before:bg-blue-400'
+                      : 'text-gray-500 before:bg-transparent hover:bg-gray-100/70 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-white/[0.04] dark:hover:text-gray-100'
                   }`}
                 >
                   <Icon className="w-4 h-4 shrink-0" />

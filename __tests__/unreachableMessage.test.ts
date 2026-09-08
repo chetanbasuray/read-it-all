@@ -45,4 +45,14 @@ describe('unreachableMessage', () => {
     rate.mockResolvedValue(null);
     expect(await unreachableMessage('not a url', true)).toContain('this site');
   });
+
+  it('names the subscriber-only situation when the page declares a paywall', async () => {
+    rate.mockResolvedValue({ total: 20, successRate: 0.9 });
+    const m = await unreachableMessage('https://www.haaretz.com/israel-news/x', false, true);
+    expect(m).toContain('haaretz.com marks this article as subscriber-only');
+    expect(m).toContain('paste your session cookies');
+    // "usually works, try again shortly" would be false hope: retrying an
+    // article the publisher deliberately withholds changes nothing
+    expect(m).not.toContain('usually works');
+  });
 });

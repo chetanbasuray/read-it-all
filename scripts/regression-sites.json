@@ -236,5 +236,11 @@
     "domain": "theverge.com",
     "url": "https://www.theverge.com/tech/981326/apple-airpods-with-cameras-demo-video-leak",
     "status": "known-good"
+  },
+  {
+    "domain": "haaretz.com",
+    "url": "https://www.haaretz.com/israel-news/israel-security/2026-09-08/ty-article-magazine/.highlight/netanyahu-got-an-explicit-warning-before-oct-7-he-didnt-brief-security-chiefs/000001a0-7a3b-d7d5-a9fc-7eff3d0f0000",
+    "status": "known-hard",
+    "note": "Hard paywall: serves only a ~500-char teaser to logged-out visitors (JSON-LD isAccessibleForFree: false), and 403s unverified crawler UAs. Expected outcome is the subscriber-only refusal, not a cached teaser."
   }
 ]

@@ -99,6 +99,80 @@ export function isPaywallBoilerplate(article: Pick<ArticleData, 'content' | 'tex
   return PAYWALL_BOILERPLATE_PATTERNS.some((p) => p.test(article.textContent));
 }
 
+// below this, an extraction from a page that declares its content paywalled is
+// the teaser the publisher shows logged-out visitors, not the article. Teasers
+// observed in the wild are a paragraph or two (haaretz.com's is ~500 chars);
+// deliberately lower than MIN_FEED_TEXT_LENGTH because metered publishers mark
+// even their shortest pieces not-free, and a complete ~900-char brief served in
+// full must keep extracting
+const MIN_PAYWALLED_TEXT_LENGTH = 800;
+
+// isAccessibleForFree appears as boolean false, "false" and "False" in the wild
+function isDeclaredNotFree(value: unknown): boolean {
+  return value === false || (typeof value === 'string' && value.toLowerCase() === 'false');
+}
+
+// schema.org's paywall markup (the pattern Google prescribes for flexible-sampling
+// publishers): the article node — or a hasPart WebPageElement naming the walled
+// section — carries isAccessibleForFree: false. A publisher sets it precisely to
+// tell crawlers the logged-out page ships only a teaser, so it is the honest
+// signal that a short extraction is the wall's preview rather than a short article
+function collectPaywallDeclaration(html: string): { declared: boolean; walledSelectors: string[] } {
+  const $ = cheerio.load(html);
+  let declared = false;
+  const walledSelectors: string[] = [];
+  for (const el of $('script[type="application/ld+json"]')) {
+    try {
+      const data = parseJsonLd($(el).text());
+      const items = Array.isArray(data) ? data : data['@graph'] || [data];
+      for (const item of items) {
+        if (!item || typeof item !== 'object') continue;
+        if (isDeclaredNotFree(item.isAccessibleForFree)) declared = true;
+        const parts = Array.isArray(item.hasPart) ? item.hasPart : [item.hasPart];
+        for (const part of parts) {
+          if (!part || typeof part !== 'object' || !isDeclaredNotFree(part.isAccessibleForFree)) continue;
+          declared = true;
+          if (typeof part.cssSelector === 'string' && part.cssSelector.trim()) {
+            walledSelectors.push(part.cssSelector.trim());
+          }
+        }
+      }
+    } catch {
+      // continue to next script tag
+    }
+  }
+  return { declared, walledSelectors };
+}
+
+export function declaresPaywalledContent(html: string): boolean {
+  return collectPaywallDeclaration(html).declared;
+}
+
+// how much text the page actually carries inside the sections its own paywall
+// markup names as walled; null when the markup names no resolvable selector.
+// This is what separates a subscriber page (full body inside the wrapper) from
+// a logged-out stub, independent of how much share-button/related-links
+// furniture surrounds it — on a stub, Readability happily sweeps that furniture
+// up and sails past any length check applied to its whole output
+export function walledSectionTextLength(html: string, walledSelectors: string[]): number | null {
+  if (walledSelectors.length === 0) return null;
+  const $ = cheerio.load(html);
+  let total = 0;
+  let resolvedAny = false;
+  for (const selector of walledSelectors) {
+    try {
+      const section = $(selector);
+      resolvedAny = true;
+      // a script's own source code is .text() too, and easily dwarfs the teaser
+      section.find('script, style, noscript, template').remove();
+      total += section.text().replace(WHITESPACE_RUN_REGEX, ' ').trim().length;
+    } catch {
+      // a selector syntax cheerio cannot parse says nothing about the page
+    }
+  }
+  return resolvedAny ? total : null;
+}
+
 // some publishers (e.g. moneycontrol.com) emit JSON-LD with a literal
 // newline/tab inside a string value instead of an escaped \n, which is
 // invalid JSON; those control characters are only ever significant inside
@@ -750,6 +824,31 @@ export function extractArticle(html: string, fetchUrl: string, canonicalUrl: str
   // only the final stored/displayed url is swapped to the resolved canonical
   const resolvedUrl = extractCanonicalUrl(preprocessed, fetchUrl) ?? canonicalUrl;
 
+  // computed lazily so the overwhelmingly common full-length extraction never
+  // pays for another parse of every ld+json script; the checks stay
+  // per-candidate (rather than rejecting the page outright) for the
+  // subscriber-cookie and crawler-cloaking cases, where one tier holds the full
+  // body while another still carries only the teaser
+  let paywall: ReturnType<typeof collectPaywallDeclaration> | null = null;
+  const isPaywalledTeaser = (candidate: Pick<ArticleData, 'textContent'>): boolean => {
+    if (candidate.textContent.length >= MIN_PAYWALLED_TEXT_LENGTH) return false;
+    paywall ??= collectPaywallDeclaration(preprocessed);
+    return paywall.declared;
+  };
+  // for candidates built from the DOM, candidate length alone is not enough: on
+  // a logged-out stub Readability pads the teaser with share buttons and
+  // related-links furniture past any threshold, so measure the section the
+  // paywall markup itself names as walled instead
+  let walledLength: number | null | undefined;
+  const domIsWalledStub = (): boolean => {
+    paywall ??= collectPaywallDeclaration(preprocessed);
+    if (!paywall.declared) return false;
+    if (walledLength === undefined) {
+      walledLength = walledSectionTextLength(preprocessed, paywall.walledSelectors);
+    }
+    return walledLength !== null && walledLength < MIN_PAYWALLED_TEXT_LENGTH;
+  };
+
   const jsonld = extractFromJsonLd(preprocessed);
   if (jsonld && jsonld.content && jsonld.content.length > 200) {
     const candidate = {
@@ -761,18 +860,20 @@ export function extractArticle(html: string, fetchUrl: string, canonicalUrl: str
       image: jsonld.image || extractFirstImage(preprocessed, fetchUrl),
       url: fetchUrl,
     };
-    if (!isPaywallBoilerplate(candidate)) {
+    // judged only by its own length: a full articleBody cloaked to crawlers is
+    // worth keeping even while the visible DOM stays walled
+    if (!isPaywallBoilerplate(candidate) && !isPaywalledTeaser(candidate)) {
       return finalizeArticle(candidate, resolvedUrl, fetchUrl);
     }
   }
 
   const fromMeta = buildArticleFromMetadata(preprocessed, fetchUrl);
-  if (fromMeta && !isPaywallBoilerplate(fromMeta)) {
+  if (fromMeta && !isPaywallBoilerplate(fromMeta) && !isPaywalledTeaser(fromMeta) && !domIsWalledStub()) {
     return finalizeArticle({ ...fromMeta, url: fetchUrl }, resolvedUrl, fetchUrl);
   }
 
   const article = parseWithReadability(preprocessed, fetchUrl);
-  if (article && !isPaywallBoilerplate(article)) {
+  if (article && !isPaywallBoilerplate(article) && !isPaywalledTeaser(article) && !domIsWalledStub()) {
     return finalizeArticle({ ...article, url: fetchUrl }, resolvedUrl, fetchUrl);
   }
 
@@ -825,6 +926,14 @@ const USER_AGENTS = [
     name: 'Googlebot-Desktop',
     xff: '66.249.66.1',
   },
+  // not a crawler: some publishers (haaretz.com) verify crawler source IPs and
+  // 403 every spoofed bot UA above while serving a plain browser the normal
+  // page; last in the rotation so crawler-cloaked full text still wins where a
+  // site offers it
+  {
+    ua: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    name: 'Chrome',
+  },
 ];
 
 const ACCEPT_VARIANTS = [
@@ -845,6 +954,10 @@ async function attemptScrape(
 
   const errors: string[] = [];
   let allBlocked = true;
+  // a page we fetched fine but refused to extract because the publisher marks
+  // the content subscriber-only; remembered so the final error says that
+  // instead of a generic parse failure
+  let sawDeclaredPaywall = false;
 
   for (const { ua, name, xff } of USER_AGENTS) {
     for (const headers of ACCEPT_VARIANTS) {
@@ -870,6 +983,10 @@ async function attemptScrape(
 
       const article = extractArticle(html, url);
       if (article) return { article, tier: 'direct-fetch' };
+      if (!sawDeclaredPaywall && declaresPaywalledContent(html)) {
+        sawDeclaredPaywall = true;
+        errors.push(`Publisher declares the content subscriber-only via isAccessibleForFree: false (${name})`);
+      }
     }
   }
 
@@ -925,6 +1042,12 @@ async function attemptScrape(
     if (browserHtml && browserHtml.length > 500 && !isBotChallengePage(browserHtml)) {
       const article = extractArticle(browserHtml, url);
       if (article) return { article, tier: 'browser-render' };
+      // a site that 403s every direct UA can still reveal its paywall
+      // declaration here, where a real browser engine fetched the page
+      if (!sawDeclaredPaywall && declaresPaywalledContent(browserHtml)) {
+        sawDeclaredPaywall = true;
+        errors.push('Publisher declares the content subscriber-only via isAccessibleForFree: false (browser render)');
+      }
     }
     errors.push('Browser rendering did not yield article content');
   } catch (e) {
@@ -951,18 +1074,29 @@ async function attemptScrape(
     errors.push('Wayback Machine: no snapshot available or rate-limited');
   }
 
-  throw new ScrapeError(await unreachableMessage(url, allBlocked), errors);
+  throw new ScrapeError(await unreachableMessage(url, allBlocked, sawDeclaredPaywall), errors);
 }
 
 // names the publisher and the sources actually tried, rather than apologising in
 // the abstract. The history line only claims what the stats have recorded, since
 // archive coverage is per-url and a publisher can start working at any time.
-export async function unreachableMessage(url: string, blocked: boolean): Promise<string> {
+export async function unreachableMessage(url: string, blocked: boolean, paywalled = false): Promise<string> {
   let domain = 'this site';
   try {
     domain = new URL(url).hostname.replace(WWW_PREFIX_REGEX, '');
   } catch {
     // keep the generic noun rather than failing to explain anything
+  }
+
+  // a declared paywall is a different situation from an unreachable or
+  // unparseable page: the publisher answered and deliberately withheld the
+  // text, so retrying will not help but a subscriber's own session will
+  if (paywalled) {
+    return (
+      `${domain} marks this article as subscriber-only and sent only its opening lines, not the full text.` +
+      ' Google Cache and the Wayback Machine had no fuller copy either.' +
+      ` If you subscribe to ${domain}, you can paste your session cookies under advanced options to read your own copy.`
+    );
   }
 
   const opening = blocked

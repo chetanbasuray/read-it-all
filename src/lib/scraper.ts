@@ -362,19 +362,39 @@ function coreImageIdentity(rawUrl: string, baseUrl: string): string | null {
 }
 
 // the reader UI renders `image` as a hero above the headline and `content`
-// verbatim below it; when a source's first in-body image is the same photo
-// used as the lead/og:image, that photo would otherwise render twice
-function stripDuplicateLeadImage(content: string, image: string | null, baseUrl: string): string {
-  if (!image) return content;
+// verbatim below it; publishers repeat the same photo throughout the body
+// (hero in a pull-quote, a slideshow, a related-articles strip, several
+// differently-sized CDN renditions of one source file), so without collapsing
+// those copies every instance shows up again below the hero. Collapses to one
+// occurrence per unique photo: the hero twin goes entirely, any other photo
+// keeps only its first appearance, and a bare <img> with no src renders as a
+// broken placeholder so it is dropped too.
+function dedupeContentImages(content: string, leadImage: string | null, baseUrl: string): string {
   const $ = cheerio.load(content);
-  const firstImg = $('img').first();
-  const src = firstImg.attr('src');
-  if (!src) return content;
-  const a = coreImageIdentity(src, baseUrl);
-  const b = coreImageIdentity(image, baseUrl);
-  if (!a || a !== b) return content;
-  const figure = firstImg.closest('figure');
-  (figure.length ? figure : firstImg).remove();
+  const leadIdentity = leadImage ? coreImageIdentity(leadImage, baseUrl) : null;
+  const seen = new Set<string>();
+  $('img').each((_, el) => {
+    const img = $(el);
+    const src = img.attr('src');
+    if (!src) {
+      const figureWithoutSrc = img.closest('figure');
+      (figureWithoutSrc.length ? figureWithoutSrc : img).remove();
+      return;
+    }
+    const identity = coreImageIdentity(src, baseUrl);
+    if (!identity) return;
+    if (leadIdentity && identity === leadIdentity) {
+      const heroTwin = img.closest('figure');
+      (heroTwin.length ? heroTwin : img).remove();
+      return;
+    }
+    if (seen.has(identity)) {
+      const duplicate = img.closest('figure');
+      (duplicate.length ? duplicate : img).remove();
+      return;
+    }
+    seen.add(identity);
+  });
   return $('body').html() || content;
 }
 
@@ -815,7 +835,7 @@ function $tryExtractContentFromNoscript(html: string): string | null {
 // itself has no <link rel=canonical>/og:url to resolve a truer identity from.
 function finalizeArticle(article: ArticleData, resolvedUrl: string, fetchUrl: string): ArticleData {
   const polished = { ...polishArticleForSite(article), url: resolvedUrl };
-  return { ...polished, content: stripDuplicateLeadImage(polished.content, polished.image, fetchUrl) };
+  return { ...polished, content: dedupeContentImages(polished.content, polished.image, fetchUrl) };
 }
 
 export function extractArticle(html: string, fetchUrl: string, canonicalUrl: string = fetchUrl): ArticleData | null {

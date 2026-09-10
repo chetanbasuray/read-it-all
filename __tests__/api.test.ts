@@ -976,6 +976,46 @@ describe('extractArticle strips a duplicate lead image from content', () => {
     const article = extractArticle(html, 'https://example.com/real-article');
     expect(article?.content).toContain('inline-1024x683.jpg');
   });
+
+  it('removes every in-body copy of the lead image, not just the first', () => {
+    const html =
+      '<html><head><meta property="og:image" content="https://example.com/wp-content/uploads/hero.jpg">' +
+      '</head><body><article><h1>Real headline</h1>' +
+      '<figure><img src="https://example.com/wp-content/uploads/hero-1200x675.jpg"></figure>' +
+      '<p>' + 'This is a real article body with enough substance to be extracted correctly. '.repeat(10) + '</p>' +
+      '<figure><img src="https://example.com/wp-content/uploads/hero.jpg"></figure>' +
+      '<p>' + 'More real article body with enough substance to be extracted correctly. '.repeat(10) + '</p>' +
+      '</article></body></html>';
+
+    const article = extractArticle(html, 'https://example.com/real-article');
+    expect(article?.content).not.toContain('hero');
+  });
+
+  it('collapses an in-body photo repeated with different CDN renders to one copy', () => {
+    const html =
+      '<html><head><meta property="og:image" content="https://example.com/lead.jpg">' +
+      '</head><body><article><h1>Real headline</h1>' +
+      '<figure><img src="https://cdn.example.com/photo-640x360.jpg"></figure>' +
+      '<p>' + 'This is a real article body with enough substance to be extracted correctly. '.repeat(10) + '</p>' +
+      '<figure><img src="https://cdn.example.com/photo-1024x576.jpg"></figure>' +
+      '<p>' + 'More real article body with enough substance to be extracted correctly. '.repeat(10) + '</p>' +
+      '</article></body></html>';
+
+    const article = extractArticle(html, 'https://example.com/real-article');
+    expect(article?.content.match(/photo-/g)).toHaveLength(1);
+  });
+
+  it('drops images with no src instead of rendering a broken placeholder', () => {
+    const html =
+      '<html><head><meta property="og:image" content="https://example.com/lead.jpg">' +
+      '</head><body><article><h1>Real headline</h1>' +
+      '<img alt="ad placeholder">' +
+      '<p>' + 'This is a real article body with enough substance to be extracted correctly. '.repeat(10) + '</p>' +
+      '</article></body></html>';
+
+    const article = extractArticle(html, 'https://example.com/real-article');
+    expect(article?.content).not.toContain('<img');
+  });
 });
 
 describe('extractArticle resolves canonical URL from the page', () => {

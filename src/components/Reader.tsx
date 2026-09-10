@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useTheme } from './ThemeProvider';
 
 interface ReaderProps {
@@ -23,6 +23,7 @@ export function Reader({ article }: ReaderProps) {
   const { theme, toggleTheme } = useTheme();
   const [fontSizeIndex, setFontSizeIndex] = useState(2);
   const [copied, setCopied] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const shareLink = useCallback(() => {
     const url = window.location.href;
@@ -47,6 +48,15 @@ export function Reader({ article }: ReaderProps) {
     }
     fetch(`/api/article/${article.id}`, { method: 'POST' }).catch(() => {});
   }, [article.id]);
+
+  useEffect(() => {
+    const container = contentRef.current;
+    if (!container) return;
+    container.querySelectorAll('img').forEach((img) => {
+      if (!img.loading) img.loading = 'lazy';
+      if (!img.decoding) img.decoding = 'async';
+    });
+  }, [article.content]);
 
   const decreaseFont = () => setFontSizeIndex((i) => Math.max(0, i - 1));
   const increaseFont = () => setFontSizeIndex((i) => Math.min(FONT_SIZES.length - 1, i + 1));
@@ -177,6 +187,7 @@ export function Reader({ article }: ReaderProps) {
           </header>
 
           <div
+            ref={contentRef}
             className={`reader-content ${currentFontSize}`}
             dangerouslySetInnerHTML={{ __html: article.content }}
           />

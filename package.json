@@ -10,7 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "format": "prettier --write .",
-    "docs:sync": "doc-sync-check src/lib --docs docs",
+    "docs:sync": "doc-sync-check src/lib --docs docs --strict",
     "check:sites": "tsx scripts/regression-check.ts",
     "sweep": "tsx scripts/reextract-sweep.ts"
   },

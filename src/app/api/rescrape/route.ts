@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ScrapeError } from '@/lib/scraper';
-import { forceRescrapeArticle, evictCachedArticle, refreshCachedArticle } from '@/lib/redis';
+import { forceRescrapeArticle, refreshCachedArticle, tombstoneArticle } from '@/lib/redis';
 import { cleanTrackingParams, hashUrl } from '@/lib/utils';
 import { normalizeAndValidateUrl } from '@/lib/urlSafety';
 import { isAuthorizedAdminRequest } from '@/lib/adminAuth';
@@ -41,10 +41,12 @@ export async function POST(request: NextRequest) {
     const canonicalUrl = cleanTrackingParams(normalizedUrl);
 
     // for takedown requests: removes the cache entry without attempting to
-    // replace it with a fresh scrape, unlike a normal rescrape
+    // replace it with a fresh scrape, unlike a normal rescrape. Tombstoned
+    // rather than merely deleted, or the permanent mapping key would let the
+    // next reader visit silently re-scrape the content back (issue #125)
     if (evictOnly) {
-      await evictCachedArticle(canonicalUrl);
-      return NextResponse.json({ evicted: true, url: canonicalUrl });
+      await tombstoneArticle(canonicalUrl);
+      return NextResponse.json({ evicted: true, tombstoned: true, url: canonicalUrl });
     }
 
     // a bulk sweep sets this: one transient block should not delete an entry

@@ -29,6 +29,12 @@ function getMappingKey(id: string): string {
   return `mapping:${id}`;
 }
 
+// durable, no TTL: marks an id whose content was removed on purpose (takedown),
+// as opposed to expired; the permanent mapping key alone cannot tell those apart
+function getTombstoneKey(id: string): string {
+  return `evicted:${id}`;
+}
+
 async function touchTtl(url: string): Promise<void> {
   try {
     await kv.expire(getCacheKey(url), CONTENT_TTL);
@@ -73,6 +79,10 @@ export async function setCachedArticle(url: string, article: ArticleData): Promi
   if (!isRedisConfigured) return;
   try {
     const id = hashUrl(url);
+    // a re-scrape triggered by another visitor (bypass, ingest, background
+    // refresh) must not resurrect content that was removed on purpose
+    const tombstoned = await kv.get(getTombstoneKey(id));
+    if (tombstoned != null) return;
     const sanitized: CachedArticle = { ...article, content: sanitizeHtml(article.content), scrapedAt: Date.now() };
     await kv.set(`article:${id}`, sanitized, { ex: CONTENT_TTL });
     await kv.set(getMappingKey(id), { url });
@@ -86,6 +96,8 @@ export async function setCachedArticle(url: string, article: ArticleData): Promi
 export async function forceRescrapeArticle(url: string): Promise<ArticleData> {
   try {
     const fresh = await scrapeArticle(url);
+    // a forced rescrape is the operator explicitly re-adding the article, so it is also the undo for a tombstone
+    await clearTombstone(url);
     await setCachedArticle(url, fresh);
     return fresh;
   } catch (error) {
@@ -153,6 +165,40 @@ export async function evictCachedArticle(url: string): Promise<void> {
     await kv.del(getCacheKey(url));
   } catch {
     // best-effort; a failed eviction just means the stale entry lives until its TTL
+  }
+}
+
+export async function tombstoneArticle(url: string): Promise<void> {
+  if (!isRedisConfigured) return;
+  try {
+    const id = hashUrl(url);
+    // tombstone before delete: dying between the two leaves a tombstone next
+    // to a still-present article, which is unservable; the other order leaves
+    // a deleted article with no tombstone, which gets silently re-scraped
+    await kv.set(getTombstoneKey(id), { evictedAt: Date.now() });
+    await kv.del(getCacheKey(url));
+  } catch {
+    // best-effort; on failure the removal is not durable yet, and the caller's
+    // registered takedown (data.json) remains the backstop that blocks re-scrapes
+  }
+}
+
+export async function isArticleEvicted(id: string): Promise<boolean> {
+  if (!isRedisConfigured) return false;
+  try {
+    const tombstone = await kv.get(getTombstoneKey(id));
+    return tombstone != null;
+  } catch {
+    return false;
+  }
+}
+
+async function clearTombstone(url: string): Promise<void> {
+  try {
+    await kv.del(getTombstoneKey(hashUrl(url)));
+  } catch {
+    // best-effort; a failed clear just means the next forced rescrape's write
+    // is discarded by the barrier and the operator retries
   }
 }
 

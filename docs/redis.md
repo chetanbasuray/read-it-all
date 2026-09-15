@@ -1,6 +1,6 @@
 # Redis Cache
 
-Vercel KV (Upstash Redis) layer behind article caching. Two keyspaces back every `/reader/<id>` link: a content entry keyed by a URL hash, and a permanent id-to-URL mapping that survives content eviction.
+Vercel KV (Upstash Redis) layer behind article caching. Three keyspaces back every `/reader/<id>` link: a content entry keyed by a URL hash, a permanent id-to-URL mapping that survives content eviction, and a durable `evicted:` tombstone marking ids whose content was removed on purpose and must not be recovered.
 
 ## getCacheKey
 
@@ -24,13 +24,13 @@ Reads the cached article for a URL, bumping its sliding TTL and triggering a sta
 
 `setCachedArticle(url: string, article: ArticleData): Promise<void>`
 
-Stores an article under its URL hash with the sliding TTL, re-sanitizing its content, and records the permanent url mapping. Cache failures are swallowed as non-critical.
+Stores an article under its URL hash with the sliding TTL, re-sanitizing its content, and records the permanent url mapping. Refuses the write while a tombstone exists, so a re-scrape triggered by another visitor cannot resurrect removed content. Cache failures are swallowed as non-critical.
 
 ## forceRescrapeArticle
 
 `forceRescrapeArticle(url: string): Promise<ArticleData>`
 
-Scrapes fresh whether or not a cache entry exists, resets `scrapedAt`, and replaces the cached content. On failure it evicts the cached article so known-wrong content is never served.
+Scrapes fresh whether or not a cache entry exists, resets `scrapedAt`, and replaces the cached content. Success clears any tombstone first (the operator explicitly re-adding an article is the undo for a takedown eviction); on failure it evicts the cached article so known-wrong content is never served, leaving any tombstone in place.
 
 ## CachedArticleSummary
 
@@ -55,6 +55,18 @@ Scrapes and re-caches an article for a sweep, unconditionally replacing content 
 `evictCachedArticle(url: string): Promise<void>`
 
 Removes the cached content entry for a URL, leaving the permanent mapping alone so an expired link can be re-scraped under the same id.
+
+## tombstoneArticle
+
+`tombstoneArticle(url: string): Promise<void>`
+
+Durably removes an article for a takedown: writes the no-TTL `evicted:` tombstone before deleting the content entry, so a crash between the two cannot leave a recoverable gap. The mapping key stays, letting the reader still name the registered takedown for the id.
+
+## isArticleEvicted
+
+`isArticleEvicted(id: string): Promise<boolean>`
+
+Whether an id carries a removal tombstone. Returns `false` when Redis is unconfigured or the read fails, matching the other readers' failure posture.
 
 ## getArticleById
 

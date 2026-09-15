@@ -3,7 +3,8 @@ import { cache } from 'react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { Reader } from '@/components/Reader';
-import { getArticleById, getArticleViews, getUrlForId } from '@/lib/redis';
+import { getArticleById, getArticleViews, getUrlForId, isArticleEvicted } from '@/lib/redis';
+import { getTakedown } from '@/lib/takedowns';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +19,9 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const article = await getArticle(params.id);
   if (!article) {
+    if (await isArticleEvicted(params.id)) {
+      return { title: 'Article removed - Read It All' };
+    }
     return { title: 'Article not found - Read It All' };
   }
 
@@ -51,6 +55,38 @@ export default async function ReaderPage({
 
   if (!article) {
     const url = await getUrlForId(params.id);
+
+    // a tombstoned id was removed on purpose (takedown), not expired: the
+    // mapping key still resolves, but recovering the content through a
+    // re-scrape is exactly what the eviction was meant to prevent
+    if (await isArticleEvicted(params.id)) {
+      const takedown = url ? getTakedown(url) : null;
+      return (
+        <div className="min-h-screen flex items-center justify-center px-4">
+          <div className="text-center">
+            <p className="text-red-500 dark:text-red-400 mb-4">
+              {takedown
+                ? `This content is not available. The publisher requested it be removed (request ${takedown.requestId}).`
+                : 'This article was removed and is no longer available.'}
+            </p>
+            {takedown && (
+              <p className="mb-4">
+                <a
+                  href={takedown.link}
+                  className="text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  See the removal request for details.
+                </a>
+              </p>
+            )}
+            <Link href="/" className="text-blue-600 dark:text-blue-400 hover:underline">
+              Back to home
+            </Link>
+          </div>
+        </div>
+      );
+    }
+
     if (url) {
       redirect(`/reader/bypass?url=${encodeURIComponent(url)}`);
     }

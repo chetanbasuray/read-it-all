@@ -406,6 +406,7 @@ describe('POST /api/rescrape', () => {
       url: 'https://example.com/article',
     };
     vi.mocked(scrapeArticle).mockResolvedValue(freshArticle);
+    vi.mocked(kv.get).mockResolvedValue(null);
 
     const response = await rescrapePOST(
       createRequest({ url: 'https://example.com/article' }, RESCRAPE_URL, { Authorization: 'Bearer test-token' }),
@@ -416,7 +417,11 @@ describe('POST /api/rescrape', () => {
     expect(data.title).toBe('Fresh Title');
     expect(scrapeArticle).toHaveBeenCalledTimes(1);
     expect(kv.set).toHaveBeenCalledTimes(2);
-    expect(kv.get).not.toHaveBeenCalled();
+    // the only read the write path performs is the tombstone barrier; the
+    // route must still never consult the cached content entry itself
+    expect(vi.mocked(kv.get).mock.calls.map(([key]) => String(key))).toEqual([
+      expect.stringMatching(/^evicted:/),
+    ]);
   });
 
   it('returns 502 when scraping fails', async () => {
@@ -452,8 +457,15 @@ describe('POST /api/rescrape', () => {
 
     expect(response.status).toBe(200);
     expect(data.evicted).toBe(true);
+    expect(data.tombstoned).toBe(true);
     expect(scrapeArticle).not.toHaveBeenCalled();
     expect(kv.del).toHaveBeenCalledWith(expect.stringMatching(/^article:/));
+    // the tombstone is what makes the takedown durable: without it the
+    // permanent mapping key re-scrapes the content back on the next visit
+    expect(kv.set).toHaveBeenCalledWith(
+      expect.stringMatching(/^evicted:/),
+      expect.objectContaining({ evictedAt: expect.any(Number) }),
+    );
   });
 });
 
@@ -1113,10 +1125,22 @@ describe('generateMetadata (reader/[id])', () => {
     const { kv } = await import('@vercel/kv');
     const { generateMetadata } = await import('@/app/(with-sidebar)/reader/[id]/page');
 
-    vi.mocked(kv.get).mockResolvedValueOnce(null);
+    vi.mocked(kv.get).mockResolvedValue(null);
 
     const metadata = await generateMetadata({ params: { id: 'missing' } });
     expect(metadata.title).toBe('Article not found - Read It All');
+  });
+
+  it('titles a tombstoned id as removed rather than not found', async () => {
+    const { kv } = await import('@vercel/kv');
+    const { generateMetadata } = await import('@/app/(with-sidebar)/reader/[id]/page');
+
+    vi.mocked(kv.get).mockImplementation(async (key: unknown) =>
+      String(key).startsWith('evicted:') ? { evictedAt: 123 } : null,
+    );
+
+    const metadata = await generateMetadata({ params: { id: 'removed' } });
+    expect(metadata.title).toBe('Article removed - Read It All');
   });
 });
 
@@ -1154,6 +1178,9 @@ describe('refreshIfStale', () => {
     const eightDaysAgo = Date.now() - 8 * 24 * 60 * 60 * 1000;
 
     vi.mocked(kv.set).mockResolvedValueOnce('OK');
+    // the cache write consults the tombstone barrier; a leaked non-null get
+    // default from an earlier test would wrongly discard the write
+    vi.mocked(kv.get).mockResolvedValue(null);
     vi.mocked(scrapeArticle).mockResolvedValueOnce({
       title: 'New Title',
       content: '<p>new</p>',
@@ -1230,13 +1257,38 @@ describe('ReaderPage recovery from expired content', () => {
     const { kv } = await import('@vercel/kv');
     const ReaderPageModule = await import('@/app/(with-sidebar)/reader/[id]/page');
 
-    vi.mocked(kv.get)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ url: 'https://example.com/expired-article' });
+    vi.mocked(kv.get).mockImplementation(async (key: unknown) =>
+      String(key).startsWith('mapping:') ? { url: 'https://example.com/expired-article' } : null,
+    );
 
     await expect(
       ReaderPageModule.default({ params: { id: 'expired-id' } }),
     ).rejects.toThrow('NEXT_REDIRECT:/reader/bypass?url=https%3A%2F%2Fexample.com%2Fexpired-article');
+  });
+
+  it('shows the removal notice instead of recovering when the id is tombstoned', async () => {
+    const { kv } = await import('@vercel/kv');
+    const ReaderPageModule = await import('@/app/(with-sidebar)/reader/[id]/page');
+
+    vi.mocked(kv.get).mockImplementation(async (key: unknown) => {
+      const k = String(key);
+      if (k.startsWith('evicted:')) return { evictedAt: 123 };
+      if (k.startsWith('mapping:')) return { url: 'https://example.com/removed-article' };
+      return null;
+    });
+
+    // rendering rather than redirecting is the point: recovery through
+    // /reader/bypass is exactly what the tombstone must prevent
+    const result = await ReaderPageModule.default({ params: { id: 'removed-id' } });
+    const collectText = (node: unknown): string => {
+      if (typeof node === 'string') return node;
+      if (Array.isArray(node)) return node.map(collectText).join(' ');
+      if (node && typeof node === 'object' && 'props' in node) {
+        return collectText((node as { props: { children?: unknown } }).props.children);
+      }
+      return '';
+    };
+    expect(collectText(result)).toContain('This article was removed');
   });
 
   it('shows the not-found page when neither content nor mapping exist', async () => {

@@ -10,7 +10,7 @@ A per-site override: an optional HTML preprocessor run before extraction and an 
 
 ## SITE_RULES
 
-`const SITE_RULES: Record<string, SiteRule> = { 'bbc.com': bbcRule, 'bbc.co.uk': bbcRule, 'reuters.com': reutersRule, 'theguardian.com': guardianRule, 'cnn.com': cnnRule, 'edition.cnn.com': cnnRule, 'timesofindia.indiatimes.com': toiRule, 'timesofisrael.com': toiIsraelRule, 'bylinetimes.com': bylineTimesRule, 'pcmag.com': pcmagRule, 'dailymail.co.uk': dailyMailRule, 'dailymail.com': dailyMailRule, 'theverge.com': vergeRule, 'thehindu.com': hinduRule, 'moneycontrol.com': moneycontrolRule, 'yahoo.com': yahooRule, 'techspot.com': techSpotRule, 'pravda.com.ua': pravdaRule, 'dw.com': dwRule, 'rte.ie': rteRule, 'arstechnica.com': arsTechnicaRule, 'eurogamer.net': eurogamerRule, 'dexerto.com': dexertoRule, 'cnbc.com': cnbcRule, 'ign.com': ignRule, 'insideevs.com': insideEvsRule, 'i24news.tv': i24NewsRule, 'fortune.com': fortuneRule, 'kyivpost.com': kyivPostRule, 'heise.de': heiseRule, 'spiegel.de': spiegelRule, 'mashable.com': mashableRule, 'indianexpress.com': indianExpressRule, 'thenationaldesk.com': nationalDeskRule, 'newindianexpress.com': newIndianExpressRule, 'news18.com': news18Rule, 'hartpunkt.de': hartpunktRule, 'apnews.com': apNewsRule, 'nytimes.com': nytimesRule, 'politico.eu': politicoRule, 'g1.globo.com': globoRule, 'aninews.in': aniNewsRule, 'politico.com': politicoComRule, }`
+`const SITE_RULES: Record<string, SiteRule> = { 'bbc.com': bbcRule, 'bbc.co.uk': bbcRule, 'reuters.com': reutersRule, 'theguardian.com': guardianRule, 'cnn.com': cnnRule, 'edition.cnn.com': cnnRule, 'timesofindia.indiatimes.com': toiRule, 'timesofisrael.com': toiIsraelRule, 'bylinetimes.com': bylineTimesRule, 'pcmag.com': pcmagRule, 'dailymail.co.uk': dailyMailRule, 'dailymail.com': dailyMailRule, 'theverge.com': vergeRule, 'thehindu.com': hinduRule, 'moneycontrol.com': moneycontrolRule, 'yahoo.com': yahooRule, 'techspot.com': techSpotRule, 'pravda.com.ua': pravdaRule, 'dw.com': dwRule, 'rte.ie': rteRule, 'arstechnica.com': arsTechnicaRule, 'eurogamer.net': eurogamerRule, 'dexerto.com': dexertoRule, 'cnbc.com': cnbcRule, 'ign.com': ignRule, 'insideevs.com': insideEvsRule, 'i24news.tv': i24NewsRule, 'fortune.com': fortuneRule, 'kyivpost.com': kyivPostRule, 'heise.de': heiseRule, 'spiegel.de': spiegelRule, 'mashable.com': mashableRule, 'indianexpress.com': indianExpressRule, 'thenationaldesk.com': nationalDeskRule, 'newindianexpress.com': newIndianExpressRule, 'news18.com': news18Rule, 'hartpunkt.de': hartpunktRule, 'apnews.com': apNewsRule, 'nytimes.com': nytimesRule, 'politico.eu': politicoRule, 'g1.globo.com': globoRule, 'aninews.in': aniNewsRule, 'politico.com': politicoComRule, 'n-tv.de': ntvRule, 'golem.de': golemRule, }`
 
 The domain-to-rule registry consulted by both the preprocess and polish helpers.
 
@@ -104,6 +104,12 @@ Fortune: HTML preprocessing only.
 
 Globo: HTML preprocessing only.
 
+## golemRule
+
+`const golemRuleSiteRule = preprocessHtml: preprocessGolemHtml, };`
+
+Golem: HTML preprocessing only.
+
 ## hartpunktRule
 
 `const hartpunktRule: SiteRule = { preprocessHtml: preprocessHartpunktHtml, }`
@@ -163,6 +169,12 @@ Mashable: HTML preprocessing only.
 `const moneycontrolRule: SiteRule = { preprocessHtml: preprocessMoneycontrolHtml, }`
 
 Moneycontrol: HTML preprocessing only.
+
+## ntvRule
+
+`const ntvRuleSiteRule = preprocessHtml: preprocessNtvHtml, };`
+
+n-tv: HTML preprocessing only.
 
 ## newIndianExpressRule
 

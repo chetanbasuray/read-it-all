@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import * as cheerio from 'cheerio';
 import { extractArticle, isPaywallBoilerplate } from '@/lib/scraper';
 import { polishArticleForSite } from '@/lib/site-rules';
 import { setCachedArticle, getCachedArticle, getArticleViews } from '@/lib/redis';
@@ -28,6 +29,15 @@ interface ArticleInput {
   byline?: string;
   excerpt?: string;
   image?: string;
+}
+
+// built with cheerio rather than string concatenation so a caller's title
+// cannot close <title> early and inject markup into the parsed document
+function documentFromContainer(title: string | undefined, content: string): string {
+  const $ = cheerio.load('<html><head><title></title></head><body><article></article></body></html>');
+  $('title').text(title ?? '');
+  $('article').html(content);
+  return $.html();
 }
 
 export async function OPTIONS() {
@@ -102,15 +112,29 @@ export async function POST(request: NextRequest) {
     }
 
     if (content && content.length > 200) {
-      article = polishArticleForSite({
-        title: title || 'Untitled',
-        content,
-        textContent: textContent || '',
-        excerpt: excerpt || (textContent || htmlToPlainText(content)).substring(0, 200),
-        byline: byline || null,
-        image: image || null,
-        url: canonicalUrl,
-      });
+      // the v1 bookmarklet, still installed wherever nobody re-dragged it, posts
+      // a raw page container plus its own tag-stripped text, which kept inline
+      // CSS and welded breadcrumbs together; running the container through the
+      // same extraction a scrape gets drops that page chrome, and the caller's
+      // own fields are only the fallback
+      const safeContent = sanitizeHtml(content);
+      const plainText = htmlToPlainText(safeContent);
+      article =
+        extractArticle(documentFromContainer(title, content), canonicalUrl) ??
+        polishArticleForSite({
+          title: title || 'Untitled',
+          content: safeContent,
+          textContent: plainText,
+          // v1 sends the head of its own welded text as the excerpt, which is
+          // no summary at all; anything else a caller sends is kept
+          excerpt:
+            excerpt && !(textContent && textContent.startsWith(excerpt))
+              ? excerpt
+              : plainText.substring(0, 200),
+          byline: byline || null,
+          image: image || null,
+          url: canonicalUrl,
+        });
     } else if (html && html.length >= 500) {
       article = extractArticle(html, canonicalUrl);
     }

@@ -41,6 +41,8 @@ import { politicoRule } from './politico.eu';
 import { globoRule } from './globo.com';
 import { aniNewsRule } from './aninews.in';
 import { politicoComRule } from './politico.com';
+import { ntvRule } from './n-tv.de';
+import { golemRule } from './golem.de';
 
 export const SITE_RULES: Record<string, SiteRule> = {
   'bbc.com': bbcRule,
@@ -86,6 +88,8 @@ export const SITE_RULES: Record<string, SiteRule> = {
   'g1.globo.com': globoRule,
   'aninews.in': aniNewsRule,
   'politico.com': politicoComRule,
+  'n-tv.de': ntvRule,
+  'golem.de': golemRule,
 };
 
 function getSiteRule(url: string): SiteRule | null {

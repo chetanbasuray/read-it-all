@@ -242,5 +242,15 @@
     "url": "https://www.haaretz.com/israel-news/israel-security/2026-09-08/ty-article-magazine/.highlight/netanyahu-got-an-explicit-warning-before-oct-7-he-didnt-brief-security-chiefs/000001a0-7a3b-d7d5-a9fc-7eff3d0f0000",
     "status": "known-hard",
     "note": "Hard paywall: serves only a ~500-char teaser to logged-out visitors (JSON-LD isAccessibleForFree: false), and 403s unverified crawler UAs. Expected outcome is the subscriber-only refusal, not a cached teaser."
+  },
+  {
+    "domain": "n-tv.de",
+    "url": "https://www.n-tv.de/politik/Merz-schwaermt-von-morgendlichen-S-Bahn-Fahrten-in-Berlin-id31318732.html",
+    "status": "known-good"
+  },
+  {
+    "domain": "golem.de",
+    "url": "https://www.golem.de/news/eu-china-soll-exporte-von-hybridautos-freiwillig-reduzieren-2609-213146.html",
+    "status": "known-good"
   }
 ]

@@ -60,13 +60,13 @@ Returns the lead image from `og:image`, `twitter:image`, or the first in-body `<
 
 `extractTitle(): string |)ull { const $`
 
-Extracts the article title from `og:title`, `twitter:title`, first `h1`, or `<title>`, stripping the publisher's `og:site_name` suffix.
+Extracts the article title from `og:title`, `twitter:title`, first `h1`, or `<title>`, stripping the publisher's own name as a suffix. The name comes from `og:site_name`, `application-name` or the JSON-LD publisher, since some publishers (golem.de) set no `og:site_name`.
 
 ## extractAuthor
 
 `extractAuthor(): string |)ull { const s`
 
-Extracts the byline from structured author metadata or DOM byline/author selectors, rejecting CMS placeholder names and unrendered timestamp widgets.
+Extracts the byline from structured author metadata or DOM byline/author selectors, rejecting CMS placeholder names, unrendered timestamp widgets, and the publisher crediting itself ("n-tv NACHRICHTEN"). When the structured data credits only the publisher, no DOM guess is made, since it would find the same self-credit in an author box.
 
 ## articleFromFeedEntry
 
@@ -78,7 +78,7 @@ Builds an `ArticleData` from a feed entry when its body is long enough to be the
 
 `parseWithReadability(, url: strin, : ArticleDa)a | null { try {`
 
-Runs Mozilla Readability over the page DOM, then sanitizes, dedupes the lead image, and resolves the byline from the most trustworthy available source.
+Runs Mozilla Readability over the page DOM, then sanitizes, dedupes the lead image, and resolves the byline from the most trustworthy available source. Its title drops the publisher suffix and, when `og:title` is exactly what follows a colon, a kicker the publisher joined ahead of the headline.
 
 ## extractArticle
 

@@ -17,6 +17,7 @@ function AcceptInner() {
     views?: number;
   } | null>(null);
   const [error, setError] = useState('');
+  const [outdatedBookmarklet, setOutdatedBookmarklet] = useState(false);
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -28,14 +29,22 @@ function AcceptInner() {
     try {
       const json = decodeURIComponent(hash.slice(1));
       const data = JSON.parse(json);
+      // only bookmarklets from before the version field existed omit it; they
+      // keep extracting in the browser and miss every server-side improvement
+      setOutdatedBookmarklet(data.bv === undefined);
 
       fetch('/api/ingest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       })
-        .then((r) => {
-          if (!r.ok) throw new Error('Ingest failed');
+        .then(async (r) => {
+          // the server's own reason (a subscription wall, a takedown) is the
+          // part the reader can act on, so it must not be replaced
+          if (!r.ok) {
+            const body = await r.json().catch(() => null);
+            throw new Error(body?.error || 'Ingest failed');
+          }
           return r.json();
         })
         .then((d) => {
@@ -77,7 +86,20 @@ function AcceptInner() {
     );
   }
 
-  return <Reader article={article} />;
+  return (
+    <>
+      {outdatedBookmarklet && (
+        <p className="text-center text-sm text-gray-500 dark:text-gray-400 px-4 py-2 border-b border-gray-200 dark:border-gray-800">
+          Your bookmarklet is out of date.{' '}
+          <a href="/bookmarklet" className="text-blue-600 dark:text-blue-400 hover:underline">
+            Drag the current one to your bookmarks bar
+          </a>{' '}
+          for cleaner titles, bylines and images.
+        </p>
+      )}
+      <Reader article={article} />
+    </>
+  );
 }
 
 export default function AcceptPage() {

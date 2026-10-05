@@ -334,11 +334,14 @@ const RESIZE_SUFFIX_REGEX = regex()
   .lookahead((b) => b.literal('.').word().oneOrMore().end())
   .toRegExp();
 
+const FILE_EXTENSION_REGEX = regex().literal('.').word().oneOrMore().end().toRegExp();
+
 // resolves what an image URL actually points at, unwrapping a Cloudflare-style
 // resize proxy (/cdn-cgi/image/<params>/<realPath>), a query-param proxy that
 // carries the real image in ?url= (politico's dims4, next/image, imgix, Photon),
-// and a WordPress-style "-WIDTHxHEIGHT" resize suffix, so two differently-sized
-// renditions of the same source photo compare equal
+// a WordPress-style "-WIDTHxHEIGHT" resize suffix, and the file format (n-tv.de
+// serves its og:image as .jpg and the in-body copy of that photo as .webp), so
+// two differently-sized or -encoded renditions of one source photo compare equal
 function coreImageIdentity(rawUrl: string, baseUrl: string): string | null {
   try {
     let u = new URL(rawUrl, baseUrl);
@@ -355,7 +358,8 @@ function coreImageIdentity(rawUrl: string, baseUrl: string): string | null {
     const cdnCgiMatch = u.pathname.match(CDN_CGI_IMAGE_PATH_REGEX);
     const pathname = cdnCgiMatch ? `/${cdnCgiMatch[1]}` : u.pathname;
     const filename = pathname.split('/').pop() || '';
-    return filename.replace(RESIZE_SUFFIX_REGEX, '');
+    // the resize suffix pattern anchors on the extension, so it must go first
+    return filename.replace(RESIZE_SUFFIX_REGEX, '').replace(FILE_EXTENSION_REGEX, '');
   } catch {
     return null;
   }
@@ -413,21 +417,69 @@ export function extractFirstImage(html: string, baseUrl: string): string | null 
   return null;
 }
 
+// every name a page gives its own publisher: og:site_name is the usual one, but
+// some publishers (golem.de) set none and only name themselves in
+// application-name or as the JSON-LD publisher
+function publisherNames($: cheerio.CheerioAPI): string[] {
+  const names = [
+    $('meta[property="og:site_name"]').attr('content'),
+    $('meta[name="application-name"]').attr('content'),
+  ];
+  for (const el of $('script[type="application/ld+json"]')) {
+    try {
+      const data = parseJsonLd($(el).text());
+      const items = Array.isArray(data) ? data : data['@graph'] || [data];
+      for (const item of items) {
+        const publishers = Array.isArray(item?.publisher) ? item.publisher : [item?.publisher];
+        for (const p of publishers) {
+          if (p && typeof p === 'object' && typeof p.name === 'string') names.push(p.name);
+        }
+      }
+    } catch {
+      // continue to next script tag
+    }
+  }
+  return [...new Set(names.map((n) => n?.trim()).filter((n): n is string => !!n))];
+}
+
 // publishers append their own name to og:title and <title> with a dash or pipe;
-// og:site_name names the exact suffix, so this needs no per-site list
-function stripSiteNameSuffix(title: string, siteName: string | undefined): string {
-  if (!siteName) return title;
-  for (const separator of [' - ', ' | ', ' – ', ' — ', ' :: ']) {
-    const suffix = `${separator}${siteName}`;
-    if (title.endsWith(suffix)) return title.slice(0, -suffix.length).trim();
+// the page's own publisher names give the exact suffix, so this needs no per-site list
+function stripSiteNameSuffix(title: string, siteNames: string[]): string {
+  for (const siteName of siteNames) {
+    for (const separator of [' - ', ' | ', ' – ', ' — ', ' :: ']) {
+      const suffix = `${separator}${siteName}`;
+      if (title.endsWith(suffix)) return title.slice(0, -suffix.length).trim();
+    }
   }
   return title;
 }
 
+// n-tv.de joins a kicker (topic line) ahead of the headline with a colon in its
+// JSON-LD headline and <title>, while og:title carries the bare headline. When
+// og:title is exactly what follows that colon it is the headline; a kicker longer
+// than what remains means og:title is a fragment, so the full title stays
+function stripKickerPrefix(title: string, headline: string | undefined): string {
+  if (!headline || headline === title || !title.endsWith(headline)) return title;
+  const kicker = title.slice(0, -headline.length).trimEnd();
+  return kicker.length > 1 && kicker.endsWith(':') && kicker.length <= headline.length ? headline : title;
+}
+
+// shared by the JSON-LD and Readability tiers, whose titles come from the
+// publisher's headline field rather than og:title
+function cleanArticleTitle(title: string, html: string): string {
+  const $ = cheerio.load(html);
+  const names = publisherNames($);
+  const ogTitle = $('meta[property="og:title"]').attr('content')?.trim();
+  return stripKickerPrefix(
+    stripSiteNameSuffix(title.trim(), names),
+    ogTitle ? stripSiteNameSuffix(ogTitle, names) : undefined,
+  );
+}
+
 export function extractTitle(html: string): string | null {
   const $ = cheerio.load(html);
-  const siteName = $('meta[property="og:site_name"]').attr('content')?.trim();
-  const clean = (title: string) => stripSiteNameSuffix(title.trim(), siteName);
+  const siteNames = publisherNames($);
+  const clean = (title: string) => stripSiteNameSuffix(title.trim(), siteNames);
 
   const ogTitle = $('meta[property="og:title"]').attr('content');
   if (ogTitle) return clean(ogTitle);
@@ -442,11 +494,34 @@ export function extractTitle(html: string): string | null {
   return null;
 }
 
+// a literal because the builder has no Unicode property classes, and accented
+// letters in a byline must still count as letters
+const NON_ALPHANUMERIC_REGEX = /[^\p{L}\p{N}]+/gu;
+const DOMAIN_SUFFIX_REGEX = regex().literal('.').letter().oneOrMore().end().toRegExp();
+
+// a publisher crediting itself as author ("n-tv NACHRICHTEN" on n-tv.de) names
+// the site, not a person. Compared on letters and digits alone because one brand
+// is spelled "n-tv" in its author field and "ntv" in its publisher field, and
+// without a domain suffix because og:site_name is often the bare domain
+function namesPublisher(byline: string, publishers: string[]): boolean {
+  const key = (text: string) => text.toLowerCase().replace(NON_ALPHANUMERIC_REGEX, '');
+  const target = key(byline);
+  return publishers.some((p) => key(p) === target || key(p.replace(DOMAIN_SUFFIX_REGEX, '')) === target);
+}
+
 // meta tag / JSON-LD, in that order: both are structured data a publisher
-// deliberately set for this exact purpose, more reliable than any DOM guess
-function extractStructuredAuthor(html: string): string | null {
-  const author = cheerio.load(html)('meta[name="author"]').attr('content');
-  return author || extractJsonLdAuthorName(html);
+// deliberately set for this exact purpose, more reliable than any DOM guess.
+// Returns null, not undefined, when that data credits only the publisher: an
+// explicit statement that no person wrote the piece, so guessing from the DOM
+// would only find the same self-credit (kyivpost.com's author box adds a bio)
+function structuredByline(html: string): string | null | undefined {
+  const $ = cheerio.load(html);
+  const publishers = publisherNames($);
+  const candidates = [$('meta[name="author"]').attr('content'), extractJsonLdAuthorName(html)].filter(
+    isRealByline,
+  );
+  if (candidates.length === 0) return undefined;
+  return candidates.find((a) => !namesPublisher(a, publishers)) ?? null;
 }
 
 const BRACKETED_PLACEHOLDER_REGEX = regex()
@@ -468,17 +543,17 @@ function isRealByline(text: string | null | undefined): text is string {
 }
 
 export function extractAuthor(html: string): string | null {
-  const structured = extractStructuredAuthor(html);
-  if (structured) return structured;
+  const structured = structuredByline(html);
+  if (structured !== undefined) return structured;
   // a byline can span sibling elements ("By" + a linked name), leaving the
   // source's own indentation/newlines between them in the joined text
-  const byline = cheerio
-    .load(html)('[class*="byline" i], [class*="author" i], [class*="by-line" i]')
+  const $ = cheerio.load(html);
+  const byline = $('[class*="byline" i], [class*="author" i], [class*="by-line" i]')
     .first()
     .text()
     .replace(WHITESPACE_RUN_REGEX, ' ')
     .trim();
-  return isRealByline(byline) ? byline : null;
+  return isRealByline(byline) && !namesPublisher(byline, publisherNames($)) ? byline : null;
 }
 
 function isConsentGatewayUrl(url: string): boolean {
@@ -732,10 +807,16 @@ export function parseWithReadability(html: string, url: string): ArticleData | n
       // source's original indentation/newlines still between them; a publisher's
       // own structured author data is never wrong this way, so it wins when present
       // every candidate goes through isRealByline: structured data is the most
-      // trustworthy source but still carries CMS defaults like "admin"
+      // trustworthy source but still carries CMS defaults like "admin". Readability
+      // reads the same author meta tag, so it needs the publisher check too
+      const structured = structuredByline(html);
+      const publishers = publisherNames(cheerio.load(html));
       const rawByline =
-        [extractStructuredAuthor(html), article.byline, extractAuthor(html)].find(isRealByline) ??
-        null;
+        structured !== undefined
+          ? structured
+          : ([article.byline, extractAuthor(html)].find(
+              (b): b is string => isRealByline(b) && !namesPublisher(b, publishers),
+            ) ?? null);
       // derived from the sanitized HTML rather than Readability's own
       // textContent, which welds block elements together and keeps the source
       // indentation; this is also the exact markup the reader renders
@@ -743,10 +824,10 @@ export function parseWithReadability(html: string, url: string): ArticleData | n
       // moneycontrol ships "S&amp;amp;P 500", which renders as "S&amp;P 500"
       const content = sanitizeHtml(decodeDoubleEscapedEntities(article.content));
       const plainText = htmlToPlainText(content);
-      // Readability's own title carries the publisher's suffix just like og:title
-      const siteName = cheerio.load(html)('meta[property="og:site_name"]').attr('content')?.trim();
+      // Readability prefers the JSON-LD headline, which carries the publisher's
+      // suffix just like og:title and, on some sites, a kicker og:title omits
       return {
-        title: stripSiteNameSuffix(article.title || '', siteName) || extractTitle(html) || 'Untitled',
+        title: cleanArticleTitle(article.title || '', html) || extractTitle(html) || 'Untitled',
         content,
         textContent: plainText,
         excerpt: article.excerpt?.trim() || plainText.substring(0, 200),
@@ -835,7 +916,11 @@ function $tryExtractContentFromNoscript(html: string): string | null {
 // itself has no <link rel=canonical>/og:url to resolve a truer identity from.
 function finalizeArticle(article: ArticleData, resolvedUrl: string, fetchUrl: string): ArticleData {
   const polished = { ...polishArticleForSite(article), url: resolvedUrl };
-  return { ...polished, content: dedupeContentImages(polished.content, polished.image, fetchUrl) };
+  const content = dedupeContentImages(polished.content, polished.image, fetchUrl);
+  // re-derived because the dedupe drops whole figures, and every tier's text
+  // must match the markup the reader renders: a removed hero twin's caption
+  // otherwise survives as the article's opening line
+  return { ...polished, content, textContent: htmlToPlainText(content) };
 }
 
 export function extractArticle(html: string, fetchUrl: string, canonicalUrl: string = fetchUrl): ArticleData | null {
@@ -871,12 +956,16 @@ export function extractArticle(html: string, fetchUrl: string, canonicalUrl: str
 
   const jsonld = extractFromJsonLd(preprocessed);
   if (jsonld && jsonld.content && jsonld.content.length > 200) {
+    const jsonldByline =
+      jsonld.byline && !namesPublisher(jsonld.byline, publisherNames(cheerio.load(preprocessed)))
+        ? jsonld.byline
+        : null;
     const candidate = {
-      title: jsonld.title || 'Untitled',
+      title: cleanArticleTitle(jsonld.title || '', preprocessed) || 'Untitled',
       content: jsonld.content,
       textContent: jsonld.textContent || '',
       excerpt: jsonld.textContent?.substring(0, 200) || '',
-      byline: jsonld.byline || extractAuthor(preprocessed) || null,
+      byline: jsonldByline || extractAuthor(preprocessed) || null,
       image: jsonld.image || extractFirstImage(preprocessed, fetchUrl),
       url: fetchUrl,
     };
